@@ -89,7 +89,7 @@ class Ppo2Agent:
         state = tf.convert_to_tensor([observation])
 
         action_probabilities = self.actor(state)
-        action_probabilities = np.random.normal(action_probabilities, self.entropy_coef)
+        # action_probabilities = np.random.normal(action_probabilities, self.entropy_coef)
         distribution = tfp.distributions.Categorical(action_probabilities)
         
         action = distribution.sample()
@@ -132,7 +132,7 @@ class Ppo2Agent:
 
                     probabilities = self.actor(states)
                     distributions = tfp.distributions.Categorical(probabilities)
-                    new_probabilities = tf.cast(distributions.log_prob(actions), dtype=tf.float64)
+                    new_probabilities = tf.cast(distributions.log_prob(actions), dtype=tf.float32)
 
                     critic_value = self.critic(states)
                     critic_value = tf.squeeze(critic_value, 1)
