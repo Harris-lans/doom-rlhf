@@ -1,17 +1,19 @@
 name: doom-rlhf
 channels:
-  - default
+  - pytorch
+  - nvidia
 dependencies:
   - python=3.9.7
   - pip
-  - tensorflow-gpu
   - ipykernel
+  - pytorch 
+  - pytorch-cuda=11.7
 
   ## PyPI packages
   - pip:
-    - gym==0.26.2
+    - gym==0.21.0
     - vizdoom==1.1.14
-    - tensorflow==2.10.0
     - numpy==1.23.2
     - opencv_python==4.7.0.72
-    - tensorflow_probability==0.18.0
+    - matplotlib==3.7.1
+    - stable-baselines3[extra]

@@ -195,7 +195,8 @@ pyrightconfig.json
 ### VizDoom
 _vizdoom.ini
 
-### Saved models
+### Saved models and logs
 models
+logs
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode

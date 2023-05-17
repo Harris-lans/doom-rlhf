@@ -37,10 +37,10 @@ class DoomEnv(Env):
         
         if state: 
             frame = self.postprocess_frame(state.screen_buffer)
-            info = state.game_variables
+            info = { i: state.game_variables[i] for i in range(len(state.game_variables)) }
         else:
             frame = np.zeros(self.observation_space.shape, dtype=self.observation_space.dtype)
-            info = 0
+            info = {  }
 
         return frame, reward, done, info
     
