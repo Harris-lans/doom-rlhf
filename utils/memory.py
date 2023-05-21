@@ -1,44 +1,19 @@
 import numpy as np
+import torch
 
 class Memory:
-    def __init__(self):
-        self.states = []
-        self.probabilities = []
-        self.values = []
-        self.actions = []
-        self.rewards = []
-        self.dones = []
+    def __init__(self, device, num_steps, num_envs, observation_space_shape, action_space_shape):
+        self.observations = torch.zeros((num_steps, num_envs) + observation_space_shape).to(device)
+        self.actions = torch.zeros((num_steps, num_envs) + action_space_shape).to(device)
+        self.log_probs = torch.zeros((num_steps, num_envs)).to(device)
+        self.rewards = torch.zeros((num_steps, num_envs)).to(device)
+        self.values = torch.zeros((num_steps, num_envs)).to(device)
+        self.dones = torch.zeros((num_steps, num_envs)).to(device)
 
-    def num_experiences(self):
-        return len(self.dones)
-
-    def generate_batches(self, batch_size):
-        n_states = len(self.states)
-        batch_start = np.arange(0, n_states, batch_size)
-        indices = np.arange(n_states, dtype=np.int64)
-        np.random.shuffle(indices)
-        batches = [indices[i : i + batch_size] for i in batch_start]
-
-        return np.array(self.states),\
-            np.array(self.actions),\
-            np.array(self.probabilities),\
-            np.array(self.values),\
-            np.array(self.rewards),\
-            np.array(self.dones),\
-            batches
-
-    def remember(self, state, action, probability, value, reward, done):
-        self.states.append(state)
-        self.actions.append(action)
-        self.probabilities.append(probability)
-        self.values.append(value)
-        self.rewards.append(reward)
-        self.dones.append(done)
-
-    def clear(self):
-        self.states = []
-        self.probabilities = []
-        self.actions = []
-        self.rewards = []
-        self.dones = []
-        self.values = []
+    def remember(self, step, observation, action, log_prob, reward, value, done):
+        self.observations[step] = observation
+        self.actions[step] = action
+        self.log_probs[step] = log_prob
+        self.rewards[step] = reward
+        self.values[step] = value
+        self.dones[step] = done
