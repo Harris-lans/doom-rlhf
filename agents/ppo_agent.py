@@ -39,12 +39,14 @@ class PpoAgent(nn.Module):
         action_space, 
         actor_model_path=None, 
         critic_model_path=None,
+        learning_rate=2.5e-4,
         use_gpu=True
     ):
         super(PpoAgent, self).__init__()
 
         self.observation_space = observation_space
         self.action_space = action_space
+        self.learning_rate = learning_rate
 
         # Creating model
         self.network = nn.Sequential(
@@ -55,7 +57,7 @@ class PpoAgent(nn.Module):
             layer_init(nn.Conv2d(64, 64, 3, stride=1)),
             nn.ReLU(),
             nn.Flatten(),
-            layer_init(nn.Linear(64 * 7 * 7, 512)),
+            layer_init(nn.Linear(64 * 11 * 16, 512)),
             nn.ReLU(),
         )
 
@@ -74,13 +76,14 @@ class PpoAgent(nn.Module):
         # Running the agent on the device
         self.to(self.device)
 
-    def get_optimal_action_and_value(self, observation):
-        hidden = self.network(observation)
+    def get_optimal_action_and_value(self, observation, action=None):
+        hidden = self.network(observation / 255.0)
         logits = self.actor(hidden)
-        probs = Categorical(logits=logits)
-        action = probs.sample()
-        log_probs = probs.log_prob(action)
         value = self.critic(hidden)
+        
+        probs = Categorical(logits=logits)
+        action = probs.sample() if action is None else action
+        log_probs = probs.log_prob(action)
         probs = probs.entropy()
 
         return action, log_probs, probs, value
@@ -102,24 +105,22 @@ class PpoAgent(nn.Module):
             max_grad_norm=0.5,
             value_coef=0.5, 
             entropy_coef=0.01, 
-            learning_rate=2.5e-4,
-            anneal_learning_rate=True,
-            learning_rate_anneal_coef=1,
+            learning_rate_anneal_coef=None,
             target_kl=None,
             normalize_advantages=True,
-            num_mini_batches=4,
+            mini_batch_size=4,
             num_training_epochs=4):
         
         # Annealing the rate if instructed to do so.
-        if anneal_learning_rate:
+        if learning_rate_anneal_coef is not None:
             # frac = 1.0 - (update - 1.0) / num_updates
-            lrnow = learning_rate_anneal_coef * learning_rate
+            lrnow = learning_rate_anneal_coef * self.learning_rate
             self.optimizer.param_groups[0]["lr"] = lrnow
 
         with torch.no_grad():
-            last_observation = observations[-1, 0]
-            last_observation_value = self.critic(self.network(last_observation)).reshape(1, -1)
-            last_done = dones[-1, 0]
+            last_observation = observations[-1]
+            last_observation_value = self.critic(self.network(last_observation / 255.0)).reshape(1, -1)
+            last_done = dones[-1]
 
             if enable_gae:
                 advantages = torch.zeros_like(rewards).to(self.device)
@@ -159,11 +160,11 @@ class PpoAgent(nn.Module):
         clip_fractions = []
         for epoch in range(num_training_epochs):
             np.random.shuffle(b_inds)
-            for start in range(0, batch_size, num_mini_batches):
-                end = start + num_mini_batches
+            for start in range(0, batch_size, mini_batch_size):
+                end = start + mini_batch_size
                 mb_inds = b_inds[start:end]
 
-                _, newlogprob, entropy, newvalue = self.get_optimal_action(b_observations[mb_inds], b_actions.long()[mb_inds])
+                _, newlogprob, entropy, newvalue = self.get_optimal_action_and_value(b_observations[mb_inds], b_actions.long()[mb_inds])
                 logratio = newlogprob - b_logprobs[mb_inds]
                 ratio = logratio.exp()
 

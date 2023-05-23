@@ -17,7 +17,7 @@ class DoomEnv(Env):
         self.game.init() # Start the game
 
         # Setting up observation and action space
-        self.observation_space = Box(low=0, high=255, shape=(120, 160, 1), dtype=np.uint8)
+        self.observation_space = Box(low=0, high=255, shape=(120, 160), dtype=np.uint8)
         self.action_space = Discrete(ACTION_SPACE_SIZE)
 
     def postprocess_frame(self, frame):
@@ -25,7 +25,7 @@ class DoomEnv(Env):
         processed_frame = cv2.cvtColor(np.moveaxis(frame, 0, -1), cv2.COLOR_BGR2GRAY)
         # Resizing frame
         processed_frame = cv2.resize(processed_frame, (160, 120), interpolation=cv2.INTER_CUBIC)
-        processed_frame = np.reshape(processed_frame, (120, 160, 1)).astype(self.observation_space.dtype)
+        processed_frame = np.reshape(processed_frame, (120, 160)).astype(self.observation_space.dtype)
 
         return processed_frame
     
