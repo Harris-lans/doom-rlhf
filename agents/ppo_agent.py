@@ -89,13 +89,16 @@ class PpoAgent(nn.Module):
         return action, log_probs, probs, value
 
     def train(
-            self, 
+            self,
+            next_observation,
+            next_done,
             observations, 
             actions, 
-            logprobs, 
+            log_probs, 
             rewards, 
             values, 
             dones,
+            num_steps,
             batch_size, 
             gamma= 0.99, 
             enable_gae=True,
@@ -113,22 +116,19 @@ class PpoAgent(nn.Module):
         
         # Annealing the rate if instructed to do so.
         if learning_rate_anneal_coef is not None:
-            # frac = 1.0 - (update - 1.0) / num_updates
             lrnow = learning_rate_anneal_coef * self.learning_rate
             self.optimizer.param_groups[0]["lr"] = lrnow
 
         with torch.no_grad():
-            last_observation = observations[-1]
-            last_observation_value = self.critic(self.network(last_observation / 255.0)).reshape(1, -1)
-            last_done = dones[-1]
+            next_value = self.critic(self.network(next_observation / 255.0)).reshape(1, -1)
 
             if enable_gae:
                 advantages = torch.zeros_like(rewards).to(self.device)
                 last_gae_lambda = 0
-                for t in reversed(range(batch_size)):
-                    if t == batch_size - 1:
-                        next_non_terminal = 1.0 - last_done
-                        next_values = last_observation_value
+                for t in reversed(range(num_steps)):
+                    if t == num_steps - 1:
+                        next_non_terminal = 1.0 - next_done
+                        next_values = next_value
                     else:
                         next_non_terminal = 1.0 - dones[t + 1]
                         next_values = values[t + 1]
@@ -137,10 +137,10 @@ class PpoAgent(nn.Module):
                 returns = advantages + values
             else:
                 returns = torch.zeros_like(rewards).to(self.device)
-                for t in reversed(range(batch_size)):
-                    if t == batch_size - 1:
-                        next_non_terminal = 1.0 - last_done
-                        next_return = last_observation_value
+                for t in reversed(range(num_steps)):
+                    if t == num_steps - 1:
+                        next_non_terminal = 1.0 - next_done
+                        next_return = next_value
                     else:
                         next_non_terminal = 1.0 - dones[t + 1]
                         next_return = returns[t + 1]
@@ -149,7 +149,7 @@ class PpoAgent(nn.Module):
         
         # Flatten the batch
         b_observations = observations.reshape((-1,) + self.observation_space.shape)
-        b_logprobs = logprobs.reshape(-1)
+        b_log_probs = log_probs.reshape(-1)
         b_actions = actions.reshape((-1,) + self.action_space.shape)
         b_values = values.reshape(-1)
         b_advantages = advantages.reshape(-1)
@@ -164,14 +164,14 @@ class PpoAgent(nn.Module):
                 end = start + mini_batch_size
                 mb_inds = b_inds[start:end]
 
-                _, newlogprob, entropy, newvalue = self.get_optimal_action_and_value(b_observations[mb_inds], b_actions.long()[mb_inds])
-                logratio = newlogprob - b_logprobs[mb_inds]
-                ratio = logratio.exp()
+                _, new_log_prob, entropy, new_value = self.get_optimal_action_and_value(b_observations[mb_inds], b_actions.long()[mb_inds])
+                log_ratio = new_log_prob - b_log_probs[mb_inds]
+                ratio = log_ratio.exp()
 
                 with torch.no_grad():
                     # Calculate approx_kl http://joschu.net/blog/kl-approx.html
-                    old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
+                    old_approx_kl = (-log_ratio).mean()
+                    approx_kl = ((ratio - 1) - log_ratio).mean()
                     clip_fractions += [((ratio - 1.0).abs() > epsilon).float().mean().item()]
 
                 mb_advantages = b_advantages[mb_inds]
@@ -184,11 +184,11 @@ class PpoAgent(nn.Module):
                 policy_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Value loss
-                newvalue = newvalue.view(-1)
+                new_value = new_value.view(-1)
                 if clip_vloss:
-                    v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
+                    v_loss_unclipped = (new_value - b_returns[mb_inds]) ** 2
                     v_clipped = b_values[mb_inds] + torch.clamp(
-                        newvalue - b_values[mb_inds],
+                        new_value - b_values[mb_inds],
                         -epsilon,
                         epsilon,
                     )
@@ -196,7 +196,7 @@ class PpoAgent(nn.Module):
                     v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
                     value_loss = 0.5 * v_loss_max.mean()
                 else:
-                    value_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
+                    value_loss = 0.5 * ((new_value - b_returns[mb_inds]) ** 2).mean()
 
                 entropy_loss = entropy.mean()
                 loss = policy_loss - entropy_coef * entropy_loss + value_loss * value_coef
