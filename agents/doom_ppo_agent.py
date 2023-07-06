@@ -33,7 +33,7 @@ class TrainingStats():
         self.clip_fraction = clip_fraction
         self.explained_variance = explained_variance
 
-class PpoAgent(nn.Module):
+class DoomPpoAgent(nn.Module):
     def __init__(
         self, 
         observation_space, 
@@ -42,7 +42,7 @@ class PpoAgent(nn.Module):
         learning_rate=2.5e-4,
         use_gpu=True
     ):
-        super(PpoAgent, self).__init__()
+        super(DoomPpoAgent, self).__init__()
 
         self.observation_space = observation_space
         self.action_space = action_space
