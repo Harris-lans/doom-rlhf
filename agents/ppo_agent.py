@@ -5,6 +5,7 @@ import torch.optim as optim
 from torch.distributions.categorical import Categorical
 from gym.spaces import Discrete
 from utils.time import *
+import os
 
 def layer_init(layer, std=np.sqrt(2), bias_constant=0.0):
     nn.init.orthogonal_(layer.weight, std)
@@ -37,8 +38,7 @@ class PpoAgent(nn.Module):
         self, 
         observation_space, 
         action_space, 
-        actor_model_path=None, 
-        critic_model_path=None,
+        models_path=None,
         learning_rate=2.5e-4,
         use_gpu=True
     ):
@@ -48,7 +48,7 @@ class PpoAgent(nn.Module):
         self.action_space = action_space
         self.learning_rate = learning_rate
 
-        # Creating model
+        # Creating networks
         self.network = nn.Sequential(
             layer_init(nn.Conv2d(self.observation_space.shape[0], 32, 8, stride=4)),
             nn.ReLU(),
@@ -60,9 +60,14 @@ class PpoAgent(nn.Module):
             layer_init(nn.Linear(64 * 11 * 16, 512)),
             nn.ReLU(),
         )
-
         self.actor = layer_init(nn.Linear(512, self.action_space.n if isinstance(self.action_space, Discrete) else self.action_space), std=0.01)
         self.critic = layer_init(nn.Linear(512, 1), std=1)
+
+        # Using existing models if model path is provided
+        if models_path is not None:
+            self.load_models(models_path)
+
+        # Creating optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate, eps=1e-5)
 
          # Choosing the device to run agent on
@@ -75,6 +80,44 @@ class PpoAgent(nn.Module):
 
         # Running the agent on the device
         self.to(self.device)
+
+    def save_models(self, path='./models'):
+        print("Saving models...")
+
+        # Creating directory if it doesn't exist
+        if not os.path.exists(path):
+            os.makedirs(path)
+            print(f"Directory '{path}' created!")
+        else:
+            print(f"Directory '{path}' already exists!")
+
+        # Saving network states
+        torch.save(self.network.state_dict(), f"{path}/base.pth")
+        torch.save(self.actor.state_dict(), f"{path}/actor.pth")
+        torch.save(self.critic.state_dict(), f"{path}/critic.pth")
+
+        print("Successfully saved models!")
+
+    def load_models(self, path='./models'):
+        # Checking if the models exist in the provided path
+        assert os.path.exists(path), "Given path is invalid."
+        assert os.path.isfile(f"{path}/base.pth"), "The given path does not contain the base model."
+        assert os.path.isfile(f"{path}/actor.pth"), "The given path does not contain the actor model."
+        assert os.path.isfile(f"{path}/critic.pth"), "The given path does not contain the critic model."
+        
+        # Loading models
+        print("Loading models...")
+        network_state_dict = torch.load(f"{path}/base.pth")
+        actor_state_dict = torch.load(f"{path}/actor.pth")
+        critic_state_dict = torch.load(f"{path}/critic.pth")
+        print("Successfully loaded models!")
+
+        # Updating networks with loaded models
+        print("Updating networks with weights from loaded models...")
+        self.network.load_state_dict(network_state_dict)
+        self.actor.load_state_dict(actor_state_dict)
+        self.critic.load_state_dict(critic_state_dict)
+        print("Successfully updated networks!")
 
     def get_optimal_action_and_value(self, observation, action=None):
         hidden = self.network(observation / 255.0)
