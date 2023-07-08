@@ -1,27 +1,43 @@
-from utils.networks import ppo_layer_init
-from gym.spaces import Discrete
-import torch.nn as nn
-import torch.optim as optim
 import torch
+from torch import nn
+import numpy as np
 
 class DoomRewardPredictor(nn.Module):
-    def __init__(self, input_shape, hidden_size=256, use_gpu=True):
-        # Creating network
-        self.network = nn.Sequential(
-            nn.Conv2d(input_shape[0], 32, 8, stride=4),
+    def __init__(self, observation_shape, action_shape, hidden_size=256, learning_rate=1e-3, use_gpu=True):
+        super(DoomRewardPredictor, self).__init__()
+
+        self.observation_shape = observation_shape
+        self.action_shape = action_shape
+
+        self.observation_encoder = nn.Sequential(
+            nn.Conv2d(observation_shape[0], 32, 8, stride=4),
             nn.ReLU(),
             nn.Conv2d(32, 64, 4, stride=2),
             nn.ReLU(),
             nn.Conv2d(64, 64, 3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.LSTM(input_size=64 * 11 * 16, hidden_size=hidden_size, num_layers=1, batch_first=True),
+            nn.Linear(64 * 11 * 16, hidden_size),
+            nn.ReLU(),
+        )
+
+        self.action_encoder = nn.Sequential(
+            nn.Linear(action_shape, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU()
+        )
+
+        # self.lstm = nn.LSTM(hidden_size * 2, hidden_size, batch_first=True)
+
+        self.reward_predictor = nn.Sequential(
+            nn.Linear(hidden_size * 2, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, 1)
         )
 
-        # Creating optimizer
-        self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        self.loss_fn = nn.MSELoss()
 
         # Choosing the device to run agent on
         if torch.cuda.is_available() and use_gpu:
@@ -33,27 +49,43 @@ class DoomRewardPredictor(nn.Module):
 
         # Running the agent on the device
         self.to(self.device)
-    
-    def train(self, model, dataloader, num_epochs, learning_rate):
-      criterion = nn.MSELoss()
 
-      for epoch in range(num_epochs):
-          running_loss = 0.0
-          for inputs, labels in dataloader:
-              self.optimizer.zero_grad()
+    def forward(self, observations, actions):
+        # Calculating observation and action encodings
+        observation_encodings = self.observation_encoder(observations)
+        action_encodings = self.action_encoder(actions.unsqueeze(-1).to(torch.float32))
+        
+        # Using to learn time series data
+        lstm_input = torch.cat((observation_encodings, action_encodings), dim=-1)
+        # lstm_output, _ = self.lstm(lstm_input)
 
-              outputs = model(inputs)
-              loss = criterion(outputs, labels)
+        reward_predictions = self.reward_predictor(lstm_input)
+        return reward_predictions
 
-              loss.backward()
-              self.optimizer.step()
+    def train(self, observations, actions, rewards, batch_size, mini_batch_size=4, num_training_epochs=4):
+        # Flatten the data
+        flattened_observations = observations.reshape((-1,) + self.observation_shape)
+        flattened_actions = actions.reshape((-1,) + tuple() if isinstance(self.action_shape, int) else self.action_shape)
+        flattened_rewards = rewards.reshape(-1)
 
-              running_loss += loss.item()
+        batch_indices = np.arange(batch_size)
 
-          epoch_loss = running_loss / len(dataloader)
-          print(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}")
+        for epoch in range(num_training_epochs):
+            np.random.shuffle(batch_indices)
+            epoch_loss = 0
+            n = 0
 
-    
-    def predict(self):
-        x = self.network(x)
-        return x.view(x.size(0), -1)
+            for start in range(0, batch_size, mini_batch_size):
+                end = start + mini_batch_size
+                mini_batch_indices = batch_indices[start:end]
+                self.optimizer.zero_grad()
+                reward_predictions = self.forward(flattened_observations[mini_batch_indices], flattened_actions.long()[mini_batch_indices])
+                loss = self.loss_fn(reward_predictions.squeeze(), flattened_rewards[mini_batch_indices])
+                loss.backward()
+                self.optimizer.step()
+                epoch_loss += loss.item()
+                n += 1
+
+            epoch_loss /= n
+            print(f'Epoch: {epoch + 1}/{num_training_epochs}, Loss: {epoch_loss:.4f}')
+

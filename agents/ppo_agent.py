@@ -39,16 +39,16 @@ class PpoAgent(nn.Module):
         base_network,
         actor_network,
         critic_network,
-        observation_space, 
-        action_space,
+        observation_shape, 
+        action_shape,
         model_path=None,
         learning_rate=2.5e-4,
         use_gpu=True
     ):
         super(PpoAgent, self).__init__()
 
-        self.observation_space = observation_space
-        self.action_space = action_space
+        self.observation_shape = observation_shape
+        self.action_shape = action_shape
         self.learning_rate = learning_rate
 
         self.network = base_network
@@ -182,9 +182,9 @@ class PpoAgent(nn.Module):
                 advantages = returns - values
         
         # Flatten the batch
-        b_observations = observations.reshape((-1,) + self.observation_space.shape)
+        b_observations = observations.reshape((-1,) + self.observation_shape)
         b_log_probs = log_probs.reshape(-1)
-        b_actions = actions.reshape((-1,) + self.action_space.shape)
+        b_actions = actions.reshape((-1,) + self.action_shape)
         b_values = values.reshape(-1)
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
