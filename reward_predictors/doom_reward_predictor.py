@@ -1,9 +1,10 @@
 import torch
 from torch import nn
 import numpy as np
+import os
 
 class DoomRewardPredictor(nn.Module):
-    def __init__(self, observation_shape, action_shape, hidden_size=256, learning_rate=1e-3, use_gpu=True):
+    def __init__(self, observation_shape, action_shape, model_path=None, hidden_size=256, learning_rate=1e-3, use_gpu=True):
         super(DoomRewardPredictor, self).__init__()
 
         self.observation_shape = observation_shape
@@ -28,15 +29,17 @@ class DoomRewardPredictor(nn.Module):
             nn.ReLU()
         )
 
-        # self.lstm = nn.LSTM(hidden_size * 2, hidden_size, batch_first=True)
-
         self.reward_predictor = nn.Sequential(
             nn.Linear(hidden_size * 2, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, 1)
         )
 
+        if model_path is not None:
+            self.load_models(model_path)
+
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.1)
         self.loss_fn = nn.MSELoss()
 
         # Choosing the device to run agent on
@@ -50,16 +53,55 @@ class DoomRewardPredictor(nn.Module):
         # Running the agent on the device
         self.to(self.device)
 
+    def save_models(self, path='./models'):
+        print("Saving models...")
+
+        # Creating directory if it doesn't exist
+        if not os.path.exists(path):
+            os.makedirs(path)
+            print(f"Directory '{path}' created!")
+        else:
+            print(f"Directory '{path}' already exists!")
+
+        # Saving network states
+        torch.save({
+            'observation_encoder': self.observation_encoder.state_dict(),
+            'action_encoder': self.action_encoder.state_dict(),
+            'reward_predictor': self.reward_predictor.state_dict()
+        }, f"{path}/reward_predictor.pth")
+
+        print("Successfully saved models!")
+
+    def load_models(self, path='./models'):
+        # Checking if the models exist in the provided path
+        assert os.path.exists(path), "Given path is invalid."
+        assert os.path.isfile(f"{path}/reward_predictor.pth"), "The given path does not contain the model."
+        
+        # Loading models
+        print("Loading models...")
+        model_dict = torch.load(f"{path}/reward_predictor.pth")
+        print("Successfully loaded models!")
+
+        # Updating networks with loaded models
+        print("Updating networks with weights from loaded models...")
+        self.observation_encoder.load_state_dict(model_dict['observation_encoder'])
+        self.action_encoder.load_state_dict(model_dict['action_encoder'])
+        self.reward_predictor.load_state_dict(model_dict['reward_predictor'])
+        print("Successfully updated networks!")
+
     def forward(self, observations, actions):
+        # Moving inputs to device
+        # observations = observations.to(self.device)
+        # actions = actions.to(self.device)
+
         # Calculating observation and action encodings
         observation_encodings = self.observation_encoder(observations)
         action_encodings = self.action_encoder(actions.unsqueeze(-1).to(torch.float32))
         
-        # Using to learn time series data
-        lstm_input = torch.cat((observation_encodings, action_encodings), dim=-1)
-        # lstm_output, _ = self.lstm(lstm_input)
+        # Predicting rewards
+        reward_predictions_input = torch.cat((observation_encodings, action_encodings), dim=-1)
+        reward_predictions = self.reward_predictor(reward_predictions_input)
 
-        reward_predictions = self.reward_predictor(lstm_input)
         return reward_predictions
 
     def train(self, observations, actions, rewards, batch_size, mini_batch_size=4, num_training_epochs=4):
@@ -70,10 +112,11 @@ class DoomRewardPredictor(nn.Module):
 
         batch_indices = np.arange(batch_size)
 
+        training_loss = 0.0
+        training_samples = 0
+
         for epoch in range(num_training_epochs):
             np.random.shuffle(batch_indices)
-            epoch_loss = 0
-            n = 0
 
             for start in range(0, batch_size, mini_batch_size):
                 end = start + mini_batch_size
@@ -83,9 +126,17 @@ class DoomRewardPredictor(nn.Module):
                 loss = self.loss_fn(reward_predictions.squeeze(), flattened_rewards[mini_batch_indices])
                 loss.backward()
                 self.optimizer.step()
-                epoch_loss += loss.item()
-                n += 1
+                training_loss += loss.item()
+                training_samples += 1
 
-            epoch_loss /= n
-            print(f'Epoch: {epoch + 1}/{num_training_epochs}, Loss: {epoch_loss:.4f}')
+            # self.scheduler.step()
 
+        avg_training_loss = training_loss / training_samples
+
+        # Training statistics
+        training_stats = {
+            'avg_loss': avg_training_loss
+        }
+
+        return training_stats
+    
