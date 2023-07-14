@@ -4,8 +4,19 @@ from gym.spaces import Discrete
 import torch.nn as nn
 
 class DoomPpoAgent(PpoAgent):
+    """Custom PPO agent specifically designed for the Doom environment."""
+    
     def __init__(self, observation_space, action_space, models_path=None, learning_rate=0.00025, use_gpu=True):
-        # Creating networks
+        """
+        Initialize the DoomPpoAgent.
+
+        Parameters:
+            observation_space (gym.Space): The observation space of the environment.
+            action_space (gym.Space): The action space of the environment.
+            models_path (str): The path to the directory where models will be saved.
+            learning_rate (float): The learning rate for the optimizer.
+            use_gpu (bool): Whether to use GPU for training.
+        """
         base_network = nn.Sequential(
             ppo_layer_init(nn.Conv2d(observation_space.shape[0], 32, 8, stride=4)),
             nn.ReLU(),

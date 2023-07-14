@@ -3,7 +3,19 @@ from torch import nn
 import numpy as np
 import os
 
+
 class CnnRewardPredictor(nn.Module):
+    """A convolutional neural network model for reward prediction.
+
+    Args:
+        observation_shape (tuple): The shape of the input observations.
+        action_shape (int or tuple): The shape of the input actions.
+        model_path (str, optional): Path to load pre-trained models from. Defaults to None.
+        hidden_size (int, optional): The size of the hidden layers. Defaults to 256.
+        learning_rate (float, optional): The learning rate for optimization. Defaults to 1e-3.
+        use_gpu (bool, optional): Whether to use GPU if available. Defaults to True.
+    """
+
     def __init__(self, observation_shape, action_shape, model_path=None, hidden_size=256, learning_rate=1e-3, use_gpu=True):
         super(CnnRewardPredictor, self).__init__()
 
@@ -54,6 +66,11 @@ class CnnRewardPredictor(nn.Module):
         self.to(self.device)
 
     def save_models(self, path='./models'):
+        """Save the model's weights to a file.
+
+        Args:
+            path (str, optional): Directory to save the models. Defaults to './models'.
+        """
         print("Saving models...")
 
         # Creating directory if it doesn't exist
@@ -73,10 +90,15 @@ class CnnRewardPredictor(nn.Module):
         print("Successfully saved models!")
 
     def load_models(self, path='./models'):
+        """Load pre-trained models from a file.
+
+        Args:
+            path (str, optional): Directory containing the models. Defaults to './models'.
+        """
         # Checking if the models exist in the provided path
         assert os.path.exists(path), "Given path is invalid."
         assert os.path.isfile(f"{path}/reward_predictor.pth"), "The given path does not contain the model."
-        
+
         # Loading models
         print("Loading models...")
         model_dict = torch.load(f"{path}/reward_predictor.pth")
@@ -90,10 +112,19 @@ class CnnRewardPredictor(nn.Module):
         print("Successfully updated networks!")
 
     def forward(self, observations, actions):
+        """Forward pass of the reward predictor.
+
+        Args:
+            observations (torch.Tensor): Input observations.
+            actions (torch.Tensor): Input actions.
+
+        Returns:
+            torch.Tensor: Predicted rewards.
+        """
         # Calculating observation and action encodings
         observation_encodings = self.observation_encoder(observations)
         action_encodings = self.action_encoder(actions.unsqueeze(-1).to(torch.float32))
-        
+
         # Predicting rewards
         reward_predictions_input = torch.cat((observation_encodings, action_encodings), dim=-1)
         reward_predictions = self.reward_predictor(reward_predictions_input)
@@ -101,6 +132,19 @@ class CnnRewardPredictor(nn.Module):
         return reward_predictions
 
     def train(self, observations, actions, rewards, batch_size, mini_batch_size=4, num_training_epochs=4):
+        """Train the reward predictor model.
+
+        Args:
+            observations (torch.Tensor): Input observations.
+            actions (torch.Tensor): Input actions.
+            rewards (torch.Tensor): Corresponding rewards.
+            batch_size (int): Batch size.
+            mini_batch_size (int, optional): Mini-batch size. Defaults to 4.
+            num_training_epochs (int, optional): Number of training epochs. Defaults to 4.
+
+        Returns:
+            dict: Training statistics.
+        """
         # Flatten the data
         flattened_observations = observations.reshape((-1,) + self.observation_shape)
         flattened_actions = actions.reshape((-1,) + tuple() if isinstance(self.action_shape, int) else self.action_shape)
@@ -118,7 +162,10 @@ class CnnRewardPredictor(nn.Module):
                 end = start + mini_batch_size
                 mini_batch_indices = batch_indices[start:end]
                 self.optimizer.zero_grad()
-                reward_predictions = self.forward(flattened_observations[mini_batch_indices], flattened_actions.long()[mini_batch_indices])
+                reward_predictions = self.forward(
+                    flattened_observations[mini_batch_indices],
+                    flattened_actions.long()[mini_batch_indices]
+                )
                 loss = self.loss_fn(reward_predictions.squeeze(), flattened_rewards[mini_batch_indices])
                 loss.backward()
                 self.optimizer.step()
@@ -135,73 +182,3 @@ class CnnRewardPredictor(nn.Module):
         }
 
         return training_stats
-    
-    def train_cv(self, observations, actions, rewards, batch_size, mini_batch_size=4, num_training_epochs=4, cv=5):
-        # Flatten the data
-        flattened_observations = observations.reshape((-1,) + self.observation_shape)
-        flattened_actions = actions.reshape((-1,) + tuple() if isinstance(self.action_shape, int) else self.action_shape)
-        flattened_rewards = rewards.reshape(-1)
-
-        fold_size = batch_size // cv
-
-        # Shuffle the data randomly
-        indices = np.random.permutation(batch_size)
-        observations = flattened_observations[indices]
-        actions = flattened_actions[indices]
-        rewards = flattened_rewards[indices]
-
-        fold_metrics = []  # List to store metrics for each fold
-
-        for fold in range(cv):
-            # Split data into training and validation sets
-            validation_start = fold * fold_size
-            validation_end = validation_start + fold_size
-            val_observations = observations[validation_start:validation_end]
-            val_actions = actions[validation_start:validation_end]
-            val_rewards = rewards[validation_start:validation_end]
-
-            train_observations = np.concatenate(
-                [observations[:validation_start], observations[validation_end:]], axis=0
-            )
-            train_actions = np.concatenate(
-                [actions[:validation_start], actions[validation_end:]], axis=0
-            )
-            train_rewards = np.concatenate(
-                [rewards[:validation_start], rewards[validation_end:]], axis=0
-            )
-
-            # Train the model on the training set
-            training_loss = 0.0
-            training_samples = 0
-
-            for epoch in range(num_training_epochs):
-                batch_indices = np.arange(train_observations.shape[0])
-                np.random.shuffle(batch_indices)
-
-                for start in range(0, train_observations.shape[0], mini_batch_size):
-                    end = start + mini_batch_size
-                    mini_batch_indices = batch_indices[start:end]
-                    self.optimizer.zero_grad()
-                    reward_predictions = self.forward(train_observations[mini_batch_indices], train_actions.long()[mini_batch_indices])
-                    loss = self.loss_fn(reward_predictions.squeeze(), train_rewards[mini_batch_indices])
-                    loss.backward()
-                    self.optimizer.step()
-                    training_loss += loss.item()
-                    training_samples += 1
-
-                # self.scheduler.step()
-
-            avg_training_loss = training_loss / training_samples
-
-            # Evaluate the model on the validation set
-            validation_predictions = self.forward(val_observations, val_actions)
-            validation_loss = self.loss_fn(validation_predictions.squeeze(), val_rewards)
-            fold_metrics.append(validation_loss.item())
-
-        # Calculate aggregate performance metrics
-        mean_loss = np.mean(fold_metrics)
-        std_loss = np.std(fold_metrics)
-
-        print("Cross-validation results:")
-        print(f"Mean Loss: {mean_loss:.4f}")
-        print(f"Standard Deviation Loss: {std_loss:.4f}")
