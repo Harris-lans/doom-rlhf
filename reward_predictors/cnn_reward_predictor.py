@@ -101,7 +101,7 @@ class CnnRewardPredictor(nn.Module):
 
         # Loading models
         print("Loading models...")
-        model_dict = torch.load(f"{path}/reward_predictor.pth")
+        model_dict = torch.load(f"{path}/reward_predictor.pth", map_location=self.device)
         print("Successfully loaded models!")
 
         # Updating networks with loaded models

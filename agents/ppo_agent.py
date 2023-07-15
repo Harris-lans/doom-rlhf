@@ -76,12 +76,6 @@ class PpoAgent(nn.Module):
         self.actor = actor_network
         self.critic = critic_network
 
-        if model_path is not None:
-            self.load_models(model_path)
-
-        # Creating optimizer
-        self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate, eps=1e-5)
-
         # Choosing the device to run agent on
         if torch.cuda.is_available() and use_gpu:
             self.device = torch.device("cuda")
@@ -89,6 +83,12 @@ class PpoAgent(nn.Module):
             self.device = torch.device("mps")
         else:
             self.device = torch.device("cpu")
+
+        if model_path is not None:
+            self.load_models(model_path)
+
+        # Creating optimizer
+        self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate, eps=1e-5)
 
         # Running the agent on the device
         self.to(self.device)
@@ -131,9 +131,9 @@ class PpoAgent(nn.Module):
         
         # Loading models
         print("Loading models...")
-        network_state_dict = torch.load(f"{path}/base.pth")
-        actor_state_dict = torch.load(f"{path}/actor.pth")
-        critic_state_dict = torch.load(f"{path}/critic.pth")
+        network_state_dict = torch.load(f"{path}/base.pth", map_location=self.device)
+        actor_state_dict = torch.load(f"{path}/actor.pth", map_location=self.device)
+        critic_state_dict = torch.load(f"{path}/critic.pth", map_location=self.device)
         print("Successfully loaded models!")
 
         # Updating networks with loaded models
