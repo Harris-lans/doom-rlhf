@@ -50,8 +50,7 @@ class PpoAgent(nn.Module):
         observation_shape, 
         action_shape,
         model_path=None,
-        learning_rate=2.5e-4,
-        use_gpu=True
+        learning_rate=2.5e-4
     ):
         """
         Initialize the PPO agent.
@@ -76,22 +75,11 @@ class PpoAgent(nn.Module):
         self.actor = actor_network
         self.critic = critic_network
 
-        # Choosing the device to run agent on
-        if torch.cuda.is_available() and use_gpu:
-            self.device = torch.device("cuda")
-        elif torch.has_mps and use_gpu:
-            self.device = torch.device("mps")
-        else:
-            self.device = torch.device("cpu")
-
         if model_path is not None:
             self.load_models(model_path)
 
         # Creating optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate, eps=1e-5)
-
-        # Running the agent on the device
-        self.to(self.device)
 
     def save_models(self, path='./models'):
         """
@@ -131,9 +119,9 @@ class PpoAgent(nn.Module):
         
         # Loading models
         print("Loading models...")
-        network_state_dict = torch.load(f"{path}/base.pth", map_location=self.device)
-        actor_state_dict = torch.load(f"{path}/actor.pth", map_location=self.device)
-        critic_state_dict = torch.load(f"{path}/critic.pth", map_location=self.device)
+        network_state_dict = torch.load(f"{path}/base.pth")
+        actor_state_dict = torch.load(f"{path}/actor.pth")
+        critic_state_dict = torch.load(f"{path}/critic.pth")
         print("Successfully loaded models!")
 
         # Updating networks with loaded models
@@ -143,7 +131,7 @@ class PpoAgent(nn.Module):
         self.critic.load_state_dict(critic_state_dict)
         print("Successfully updated networks!")
 
-    def get_optimal_action_and_value(self, observation, action=None):
+    def forward(self, observation, action=None):
         """
         Compute the optimal action and corresponding value for a given observation.
 
@@ -233,7 +221,7 @@ class PpoAgent(nn.Module):
             next_value = self.critic(self.network(next_observation / 255.0)).reshape(1, -1)
 
             if enable_gae:
-                advantages = torch.zeros_like(rewards).to(self.device)
+                advantages = torch.zeros_like(rewards)
                 last_gae_lambda = 0
                 for t in reversed(range(num_steps)):
                     if t == num_steps - 1:
@@ -246,7 +234,7 @@ class PpoAgent(nn.Module):
                     advantages[t] = last_gae_lambda = delta + gamma * gae_lambda * next_non_terminal * last_gae_lambda
                 returns = advantages + values
             else:
-                returns = torch.zeros_like(rewards).to(self.device)
+                returns = torch.zeros_like(rewards)
                 for t in reversed(range(num_steps)):
                     if t == num_steps - 1:
                         next_non_terminal = 1.0 - next_done
@@ -274,7 +262,7 @@ class PpoAgent(nn.Module):
                 end = start + mini_batch_size
                 mb_inds = b_inds[start:end]
 
-                _, new_log_prob, entropy, new_value = self.get_optimal_action_and_value(b_observations[mb_inds], b_actions.long()[mb_inds])
+                _, new_log_prob, entropy, new_value = self.forward(b_observations[mb_inds], b_actions.long()[mb_inds])
                 log_ratio = new_log_prob - b_log_probs[mb_inds]
                 ratio = log_ratio.exp()
 
