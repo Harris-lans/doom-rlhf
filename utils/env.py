@@ -28,7 +28,7 @@ def make_doom_env(level_config_path, frame_stack_size=4, record_episodes=False, 
 
     return thunk
 
-def make_vizdoom_env(level, render_mode=None, frame_stack_size=4, record_episodes=False):
+def make_vizdoom_env(level: str, render_mode=None, frame_stack_size=4, record_episodes=False):
     """Factory function to create a Doom environment with specified configurations.
 
     Args:
@@ -42,9 +42,12 @@ def make_vizdoom_env(level, render_mode=None, frame_stack_size=4, record_episode
     """
     def thunk():
         env = VizdoomEnv(level, render_mode=render_mode)
+
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if record_episodes:
             env = gym.wrappers.RecordVideo(env, f"videos/{current_timestamp_ms()}")
+
+        # Observation wrappers
         env = gym.wrappers.ResizeObservation(env, (120, 160))
         env = gym.wrappers.GrayScaleObservation(env)
         env = gym.wrappers.FrameStack(env, frame_stack_size)

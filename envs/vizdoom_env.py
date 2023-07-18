@@ -135,7 +135,7 @@ class VizdoomEnv(gym.Env, EzPickle):
         truncated = False  # Truncation to be handled by the TimeLimit wrapper
         if self.render_mode == "human":
             self.render()
-        return self.__collect_observations(), reward, terminated, truncated, {}
+        return self.__collect_observation(), reward, terminated, truncated, {}
 
     def __parse_binary_buttons(self, env_action, agent_action):
         if self.num_binary_buttons != 0:
@@ -178,34 +178,13 @@ class VizdoomEnv(gym.Env, EzPickle):
         self.game.new_episode()
         self.state = self.game.get_state()
 
-        return self.__collect_observations(), {}
-
-    def __collect_observations(self):
-        observation = {}
-        if self.state is not None:
-            observation["screen"] = self.state.screen_buffer
-            if self.channels == 1:
-                observation["screen"] = self.state.screen_buffer[..., None]
-            if self.depth:
-                observation["depth"] = self.state.depth_buffer[..., None]
-            if self.labels:
-                observation["labels"] = self.state.labels_buffer[..., None]
-            if self.automap:
-                observation["automap"] = self.state.automap_buffer
-                if self.channels == 1:
-                    observation["automap"] = self.state.automap_buffer[..., None]
-            if self.num_game_variables > 0:
-                observation["gamevariables"] = self.state.game_variables.astype(
-                    np.float32
-                )
+        return self.__collect_observation(), {}
+    
+    def __collect_observation(self):
+        if self.state:
+            return np.array(self.state.screen_buffer)
         else:
-            # there is no state in the terminal step, so a zero observation is returned instead
-            for space_key, space_item in self.observation_space.spaces.items():
-                observation[space_key] = np.zeros(
-                    space_item.shape, dtype=space_item.dtype
-                )
-
-        return observation
+            return np.zeros(self.observation_space.shape, dtype=self.observation_space.dtype)
 
     def __build_human_render_image(self):
         """Stack all available buffers into one for human consumption"""
@@ -357,63 +336,6 @@ class VizdoomEnv(gym.Env, EzPickle):
             )
 
     def __get_observation_space(self):
-        """
-        return observation space: Dict with Box entry for each activated buffer:
-          "screen", "depth", "labels", "automap", "gamevariables"
-        """
-        spaces = {
-            "screen": gym.spaces.Box(
-                0,
-                255,
-                (
-                    self.game.get_screen_height(),
-                    self.game.get_screen_width(),
-                    self.channels,
-                ),
-                dtype=np.uint8,
-            )
-        }
-
-        if self.depth:
-            spaces["depth"] = gym.spaces.Box(
-                0,
-                255,
-                (self.game.get_screen_height(), self.game.get_screen_width(), 1),
-                dtype=np.uint8,
-            )
-
-        if self.labels:
-            spaces["labels"] = gym.spaces.Box(
-                0,
-                255,
-                (self.game.get_screen_height(), self.game.get_screen_width(), 1),
-                dtype=np.uint8,
-            )
-
-        if self.automap:
-            spaces["automap"] = gym.spaces.Box(
-                0,
-                255,
-                (
-                    self.game.get_screen_height(),
-                    self.game.get_screen_width(),
-                    # "automap" buffer uses same number of channels
-                    # as the main screen buffer,
-                    self.channels,
-                ),
-                dtype=np.uint8,
-            )
-
-        self.num_game_variables = self.game.get_available_game_variables_size()
-        if self.num_game_variables > 0:
-            spaces["gamevariables"] = gym.spaces.Box(
-                np.finfo(np.float32).min,
-                np.finfo(np.float32).max,
-                (self.num_game_variables,),
-                dtype=np.float32,
-            )
-
-        # return gym.spaces.Dict(spaces)
         return gym.spaces.Box(
             0,
             255,
