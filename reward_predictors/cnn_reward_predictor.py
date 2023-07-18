@@ -89,11 +89,12 @@ class CnnRewardPredictor(nn.Module):
 
         print("Successfully saved models!")
 
-    def load_models(self, path='./models'):
+    def load_models(self, path, device):
         """Load pre-trained models from a file.
 
         Args:
-            path (str, optional): Directory containing the models. Defaults to './models'.
+            path (str): Directory containing the models.
+            device (torch.device): The device in which the models should be loaded to.
         """
         # Checking if the models exist in the provided path
         assert os.path.exists(path), "Given path is invalid."
