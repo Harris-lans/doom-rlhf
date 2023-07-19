@@ -199,5 +199,6 @@ _vizdoom.ini
 models
 logs
 runs
+videos
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode

@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
-from gym.spaces import Discrete
 from utils.time import *
 import os
 
@@ -41,7 +40,7 @@ class TrainingStats():
         self.clip_fraction = clip_fraction
         self.explained_variance = explained_variance
 
-class PpoAgent(nn.Module):
+class BasePpoAgent(nn.Module):
     def __init__(
         self, 
         base_network,
@@ -49,7 +48,6 @@ class PpoAgent(nn.Module):
         critic_network,
         observation_shape, 
         action_shape,
-        model_path=None,
         learning_rate=2.5e-4
     ):
         """
@@ -61,11 +59,10 @@ class PpoAgent(nn.Module):
             critic_network (torch.nn.Module): The critic network.
             observation_shape (tuple): The shape of the observation space.
             action_shape (tuple): The shape of the action space.
-            model_path (str): The path to the directory where models will be saved.
             learning_rate (float): The learning rate for the optimizer.
             use_gpu (bool): Whether to use GPU for training.
         """
-        super(PpoAgent, self).__init__()
+        super(BasePpoAgent, self).__init__()
 
         self.observation_shape = observation_shape
         self.action_shape = action_shape
@@ -74,9 +71,6 @@ class PpoAgent(nn.Module):
         self.network = base_network
         self.actor = actor_network
         self.critic = critic_network
-
-        if model_path is not None:
-            self.load_models(model_path)
 
         # Creating optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate, eps=1e-5)
@@ -104,12 +98,13 @@ class PpoAgent(nn.Module):
 
         print("Successfully saved models!")
 
-    def load_models(self, path='./models'):
+    def load_models(self, path, device):
         """
         Load the agent's models.
 
         Parameters:
             path (str): The path to the directory where models are saved.
+            device (torch.device): The device in which the models should be loaded to.
         """
         # Checking if the models exist in the provided path
         assert os.path.exists(path), "Given path is invalid."
@@ -119,9 +114,9 @@ class PpoAgent(nn.Module):
         
         # Loading models
         print("Loading models...")
-        network_state_dict = torch.load(f"{path}/base.pth")
-        actor_state_dict = torch.load(f"{path}/actor.pth")
-        critic_state_dict = torch.load(f"{path}/critic.pth")
+        network_state_dict = torch.load(f"{path}/base.pth", map_location=device)
+        actor_state_dict = torch.load(f"{path}/actor.pth", map_location=device)
+        critic_state_dict = torch.load(f"{path}/critic.pth", map_location=device)
         print("Successfully loaded models!")
 
         # Updating networks with loaded models

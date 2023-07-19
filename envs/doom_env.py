@@ -1,5 +1,5 @@
-from gym import Env
-from gym.spaces import Discrete, Box
+from gymnasium import Env
+from gymnasium.spaces import Discrete, Box
 import numpy as np
 import cv2
 from vizdoom import DoomGame
@@ -22,7 +22,7 @@ class DoomEnv(Env):
         self.game.load_config(config_path)
         self.game.set_window_visible(render)
         self.game.init()
-        self.observation_space = Box(low=0, high=255, shape=(120, 160), dtype=np.uint8)
+        self.observation_space = Box(low=0, high=255, shape=self.game.get_state().screen_buffer.shape, dtype=np.uint8)
         self.action_space = Discrete(ACTION_SPACE_SIZE)
 
     def postprocess_frame(self, frame):
