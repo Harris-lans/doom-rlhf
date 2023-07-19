@@ -3,7 +3,7 @@ from envs.doom_env import DoomEnv
 from envs.vizdoom_env import VizdoomEnv
 from utils.time import current_timestamp_ms
 
-def make_doom_env(level_config_path, frame_stack_size=4, record_episodes=False, render=True):
+def make_doom_env(level_config_path, frame_stack_size=4, record_episodes=False, render=True, recording_save_path=f"videos/{current_timestamp_ms()}"):
     """Factory function to create a Doom environment with specified configurations.
 
     Args:
@@ -19,7 +19,7 @@ def make_doom_env(level_config_path, frame_stack_size=4, record_episodes=False, 
         env = DoomEnv(level_config_path, render)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if record_episodes:
-            env = gym.wrappers.RecordVideo(env, f"videos/[{level_config_path}]_{current_timestamp_ms()}")
+            env = gym.wrappers.RecordVideo(env, recording_save_path)
         env = gym.wrappers.ResizeObservation(env, (120, 160))
         env = gym.wrappers.GrayScaleObservation(env, True)
         env = gym.wrappers.FrameStack(env, frame_stack_size)
@@ -28,7 +28,7 @@ def make_doom_env(level_config_path, frame_stack_size=4, record_episodes=False, 
 
     return thunk
 
-def make_vizdoom_env(level: str, render_mode=None, frame_stack_size=4, record_episodes=False):
+def make_vizdoom_env(level: str, render_mode=None, frame_stack_size=4, record_episodes=False, recording_save_path=f"videos/{current_timestamp_ms()}"):
     """Factory function to create a Doom environment with specified configurations.
 
     Args:
@@ -45,7 +45,7 @@ def make_vizdoom_env(level: str, render_mode=None, frame_stack_size=4, record_ep
 
         env = gym.wrappers.RecordEpisodeStatistics(env)
         if record_episodes:
-            env = gym.wrappers.RecordVideo(env, f"videos/{current_timestamp_ms()}")
+            env = gym.wrappers.RecordVideo(env, recording_save_path)
 
         # Observation wrappers
         env = gym.wrappers.ResizeObservation(env, (120, 160))
