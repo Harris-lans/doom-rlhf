@@ -6,7 +6,7 @@ import torch.nn as nn
 class DoomPpoAgent(BasePpoAgent):
     """Custom PPO agent specifically designed for the Doom environment."""
     
-    def __init__(self, observation_space, action_space, learning_rate=0.00025):
+    def __init__(self, observation_space, action_space, learning_rate=0.00025, use_gpu=True):
         """
         Initialize the DoomPpoAgent.
 
@@ -31,4 +31,4 @@ class DoomPpoAgent(BasePpoAgent):
         actor_network = ppo_layer_init(nn.Linear(512, action_space.n if isinstance(action_space, Discrete) else action_space.shape), std=0.01)
         critic_network = ppo_layer_init(nn.Linear(512, 1), std=1)
 
-        super().__init__(base_network, actor_network, critic_network, observation_space.shape, action_space.shape, learning_rate)
+        super().__init__(base_network, actor_network, critic_network, observation_space.shape, action_space.shape, learning_rate, use_gpu)

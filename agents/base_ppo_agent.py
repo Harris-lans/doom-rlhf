@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
 from utils.time import *
+from utils.replay_buffer import ReplayBuffer
 import os
 
 class TrainingStats():
@@ -48,7 +49,8 @@ class BasePpoAgent(nn.Module):
         critic_network,
         observation_shape, 
         action_shape,
-        learning_rate=2.5e-4
+        learning_rate=2.5e-4,
+        use_gpu=True
     ):
         """
         Initialize the PPO agent.
@@ -75,6 +77,17 @@ class BasePpoAgent(nn.Module):
         # Creating optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=self.learning_rate, eps=1e-5)
 
+        # Choosing device
+        if torch.cuda.is_available() and use_gpu:
+            self.device = torch.device("cuda")
+        elif torch.has_mps and use_gpu:
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
+
+        # Moving torch module to chosen device
+        self.to(self.device)
+
     def save_models(self, path='./models'):
         """
         Save the agent's models.
@@ -98,13 +111,12 @@ class BasePpoAgent(nn.Module):
 
         print("Successfully saved models!")
 
-    def load_models(self, path, device):
+    def load_models(self, path):
         """
         Load the agent's models.
 
         Parameters:
             path (str): The path to the directory where models are saved.
-            device (torch.device): The device in which the models should be loaded to.
         """
         # Checking if the models exist in the provided path
         assert os.path.exists(path), "Given path is invalid."
@@ -114,9 +126,9 @@ class BasePpoAgent(nn.Module):
         
         # Loading models
         print("Loading models...")
-        network_state_dict = torch.load(f"{path}/base.pth", map_location=device)
-        actor_state_dict = torch.load(f"{path}/actor.pth", map_location=device)
-        critic_state_dict = torch.load(f"{path}/critic.pth", map_location=device)
+        network_state_dict = torch.load(f"{path}/base.pth", map_location=self.device)
+        actor_state_dict = torch.load(f"{path}/actor.pth", map_location=self.device)
+        critic_state_dict = torch.load(f"{path}/critic.pth", map_location=self.device)
         print("Successfully loaded models!")
 
         # Updating networks with loaded models
@@ -126,7 +138,7 @@ class BasePpoAgent(nn.Module):
         self.critic.load_state_dict(critic_state_dict)
         print("Successfully updated networks!")
 
-    def forward(self, observation, action=None):
+    def forward(self, observations, actions=None):
         """
         Compute the optimal action and corresponding value for a given observation.
 
@@ -140,29 +152,47 @@ class BasePpoAgent(nn.Module):
             torch.Tensor: The entropy of the action distribution.
             torch.Tensor: The value estimation.
         """
-        hidden = self.network(observation / 255.0)
-        logits = self.actor(hidden)
-        value = self.critic(hidden)
+        observations = observations if torch.is_tensor(observations) else torch.tensor(observations).to(self.device)
+
+        with torch.no_grad():
+            hidden = self.network(observations / 255.0)
+            logits = self.actor(hidden)
+            value = self.critic(hidden)
         
         probs = Categorical(logits=logits)
-        action = probs.sample() if action is None else action
-        log_probs = probs.log_prob(action)
+        actions = probs.sample()
+        log_probs = probs.log_prob(actions)
         probs = probs.entropy()
 
-        return action, log_probs, probs, value
+        return actions.cpu().numpy(), log_probs.cpu().numpy(), probs.cpu().numpy(), value.cpu().numpy()
+    
+    def _training_forward(self, observations, actions):
+        """
+        Compute the optimal action and corresponding value for a given observation.
 
+        Parameters:
+            observation (torch.Tensor): The input observation.
+            action (torch.Tensor): The action tensor (optional).
+
+        Returns:
+            torch.Tensor: The sampled action.
+            torch.Tensor: The log probability of the action.
+            torch.Tensor: The entropy of the action distribution.
+            torch.Tensor: The value estimation.
+        """
+        hidden = self.network(observations / 255.0)
+        logits = self.actor(hidden)
+        value = self.critic(hidden)
+
+        probs = Categorical(logits=logits)
+        log_probs = probs.log_prob(actions)
+        probs = probs.entropy()
+
+        return actions, log_probs, probs, value
+        
     def train(
             self,
-            next_observation,
-            next_done,
-            observations, 
-            actions, 
-            log_probs, 
-            rewards, 
-            values, 
-            dones,
-            num_steps,
-            batch_size, 
+            replay_buffer: ReplayBuffer, 
             gamma= 0.99, 
             enable_gae=True,
             gae_lambda=0.95, 
@@ -180,14 +210,12 @@ class BasePpoAgent(nn.Module):
         Train the PPO agent.
 
         Parameters:
-            next_observation (torch.Tensor): The next observation.
-            next_done (torch.Tensor): The next done signal.
-            observations (torch.Tensor): The batch of observations.
-            actions (torch.Tensor): The batch of actions.
-            log_probs (torch.Tensor): The batch of log probabilities.
-            rewards (torch.Tensor): The batch of rewards.
-            values (torch.Tensor): The batch of value estimations.
-            dones (torch.Tensor): The batch of done signals.
+            observations (ndarray): The batch of observations.
+            actions (ndarray): The batch of actions.
+            log_probs (ndarray): The batch of log probabilities.
+            rewards (ndarray): The batch of rewards.
+            values (ndarray): The batch of value estimations.
+            dones (ndarray): The batch of done signals.
             num_steps (int): The number of steps taken in the environment.
             batch_size (int): The size of the batch.
             gamma (float): The discount factor.
@@ -212,35 +240,35 @@ class BasePpoAgent(nn.Module):
             lrnow = learning_rate_anneal_coef * self.learning_rate
             self.optimizer.param_groups[0]["lr"] = lrnow
 
-        with torch.no_grad():
-            next_value = self.critic(self.network(next_observation / 255.0)).reshape(1, -1)
+        # Convert replay buffer data into tensors
+        observations = torch.Tensor(replay_buffer.observations).to(self.device)
+        actions = torch.Tensor(replay_buffer.actions).to(self.device)
+        log_probs = torch.Tensor(replay_buffer.log_probs).to(self.device)
+        rewards = torch.Tensor(replay_buffer.rewards).to(self.device)
+        values = torch.Tensor(replay_buffer.values).to(self.device)
+        dones = torch.Tensor(replay_buffer.dones).to(self.device)
 
-            if enable_gae:
-                advantages = torch.zeros_like(rewards)
-                last_gae_lambda = 0
-                for t in reversed(range(num_steps)):
-                    if t == num_steps - 1:
-                        next_non_terminal = 1.0 - next_done
-                        next_values = next_value
-                    else:
-                        next_non_terminal = 1.0 - dones[t + 1]
-                        next_values = values[t + 1]
-                    delta = rewards[t] + gamma * next_values * next_non_terminal - values[t]
-                    advantages[t] = last_gae_lambda = delta + gamma * gae_lambda * next_non_terminal * last_gae_lambda
-                returns = advantages + values
-            else:
-                returns = torch.zeros_like(rewards)
-                for t in reversed(range(num_steps)):
-                    if t == num_steps - 1:
-                        next_non_terminal = 1.0 - next_done
-                        next_return = next_value
-                    else:
-                        next_non_terminal = 1.0 - dones[t + 1]
-                        next_return = returns[t + 1]
-                    returns[t] = rewards[t] + gamma * next_non_terminal * next_return
-                advantages = returns - values
-        
-        # Flatten the batch
+        # Get the number of steps and the number of environments
+        num_steps, num_envs = replay_buffer.num_steps, replay_buffer.num_envs
+
+        if enable_gae:
+            advantages = torch.zeros_like(rewards)
+            last_gae_lambda = 0
+            for t in reversed(range(num_steps - 1)):
+                next_non_terminal = 1.0 - dones[t + 1]
+                next_values = values[t + 1]
+                delta = rewards[t] + gamma * next_values * next_non_terminal - values[t]
+                advantages[t] = last_gae_lambda = delta + gamma * gae_lambda * next_non_terminal * last_gae_lambda
+            returns = advantages + values
+        else:
+            returns = torch.zeros_like(rewards)
+            for t in reversed(range(num_steps - 1)):
+                next_non_terminal = 1.0 - dones[t + 1]
+                next_return = returns[t + 1]
+                returns[t] = rewards[t] + gamma * next_non_terminal * next_return
+            advantages = returns - values
+
+        # Flatten the batched transitions
         b_observations = observations.reshape((-1,) + self.observation_shape)
         b_log_probs = log_probs.reshape(-1)
         b_actions = actions.reshape((-1,) + self.action_shape)
@@ -249,15 +277,16 @@ class BasePpoAgent(nn.Module):
         b_returns = returns.reshape(-1)
 
         # Optimizing the policy and value network
-        b_inds = np.arange(batch_size)
+        total_num_steps = num_steps * num_envs
+        b_inds = np.arange(total_num_steps)
         clip_fractions = []
         for epoch in range(num_training_epochs):
             np.random.shuffle(b_inds)
-            for start in range(0, batch_size, mini_batch_size):
+            for start in range(0, total_num_steps, mini_batch_size):
                 end = start + mini_batch_size
                 mb_inds = b_inds[start:end]
 
-                _, new_log_prob, entropy, new_value = self.forward(b_observations[mb_inds], b_actions.long()[mb_inds])
+                _, new_log_prob, entropy, new_value = self._training_forward(b_observations[mb_inds], b_actions.long()[mb_inds])
                 log_ratio = new_log_prob - b_log_probs[mb_inds]
                 ratio = log_ratio.exp()
 
