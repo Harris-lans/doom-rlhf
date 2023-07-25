@@ -5,8 +5,9 @@ import os
 from losses.preference_loss import PreferenceLoss
 from utils.segment import Segment
 import math
+from typing import Tuple
 
-class CnnRewardPredictor(nn.Module):
+class BaseHumanPreferenceRewardPredictor(nn.Module):
     """A convolutional neural network model for reward prediction.
 
     Args:
@@ -18,36 +19,15 @@ class CnnRewardPredictor(nn.Module):
         use_gpu (bool, optional): Whether to use GPU if available. Defaults to True.
     """
 
-    def __init__(self, observation_shape, action_shape, hidden_size=256, learning_rate=1e-3, use_gpu=True):
-        super(CnnRewardPredictor, self).__init__()
+    def __init__(self, observation_encoder: nn.Sequential, action_encoder: nn.Sequential, reward_predictor: nn.Sequential, observation_shape: Tuple[int, ...], action_shape: Tuple[int, ...], learning_rate=1e-3, use_gpu=True):
+        super(BaseHumanPreferenceRewardPredictor, self).__init__()
 
         self.observation_shape = observation_shape
         self.action_shape = action_shape
 
-        self.observation_encoder = nn.Sequential(
-            nn.Conv2d(observation_shape[0], 32, 8, stride=4),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, 4, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, 3, stride=1),
-            nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(64 * 11 * 16, hidden_size),
-            nn.ReLU(),
-        )
-
-        self.action_encoder = nn.Sequential(
-            nn.Linear(action_shape, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU()
-        )
-
-        self.reward_predictor = nn.Sequential(
-            nn.Linear(hidden_size * 2, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, 1)
-        )
+        self.observation_encoder = observation_encoder
+        self.action_encoder = action_encoder
+        self.reward_predictor = reward_predictor
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.1)
@@ -88,12 +68,11 @@ class CnnRewardPredictor(nn.Module):
 
         print("Successfully saved models!")
 
-    def load_models(self, path, device):
+    def load_models(self, path):
         """Load pre-trained models from a file.
 
         Args:
             path (str): Directory containing the models.
-            device (torch.device): The device in which the models should be loaded to.
         """
         # Checking if the models exist in the provided path
         assert os.path.exists(path), "Given path is invalid."
@@ -128,12 +107,13 @@ class CnnRewardPredictor(nn.Module):
             # Calculating observation and action encodings
             observation_encodings = self.observation_encoder(observations / 255.0)
             action_encodings = self.action_encoder(actions.unsqueeze(-1).to(torch.float32))
+            # action_encodings = self.action_encoder(actions.to(torch.float32))
 
             # Predicting rewards
             reward_predictions_input = torch.cat((observation_encodings, action_encodings), dim=-1)
             reward_predictions = self.reward_predictor(reward_predictions_input)
 
-        return reward_predictions.cpu().numpy()
+        return reward_predictions.squeeze().cpu().numpy()
     
     def _training_forward(self, observations: torch.Tensor, actions: torch.Tensor):
         """Forward pass of the reward predictor.
