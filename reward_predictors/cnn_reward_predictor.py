@@ -2,7 +2,9 @@ import torch
 from torch import nn
 import numpy as np
 import os
-
+from losses.preference_loss import PreferenceLoss
+from utils.segment import Segment
+import math
 
 class CnnRewardPredictor(nn.Module):
     """A convolutional neural network model for reward prediction.
@@ -16,7 +18,7 @@ class CnnRewardPredictor(nn.Module):
         use_gpu (bool, optional): Whether to use GPU if available. Defaults to True.
     """
 
-    def __init__(self, observation_shape, action_shape, model_path=None, hidden_size=256, learning_rate=1e-3, use_gpu=True):
+    def __init__(self, observation_shape, action_shape, hidden_size=256, learning_rate=1e-3, use_gpu=True):
         super(CnnRewardPredictor, self).__init__()
 
         self.observation_shape = observation_shape
@@ -47,12 +49,9 @@ class CnnRewardPredictor(nn.Module):
             nn.Linear(hidden_size, 1)
         )
 
-        if model_path is not None:
-            self.load_models(model_path)
-
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.1)
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = PreferenceLoss()
 
         # Choosing the device to run agent on
         if torch.cuda.is_available() and use_gpu:
@@ -116,6 +115,30 @@ class CnnRewardPredictor(nn.Module):
         """Forward pass of the reward predictor.
 
         Args:
+            observations (np.Array): Input observations.
+            actions (np.Array): Input actions.
+
+        Returns:
+            torch.Tensor: Predicted rewards.
+        """
+        observations = torch.tensor(observations).to(self.device)
+        actions = torch.tensor(actions).to(self.device)
+
+        with torch.no_grad():
+            # Calculating observation and action encodings
+            observation_encodings = self.observation_encoder(observations / 255.0)
+            action_encodings = self.action_encoder(actions.unsqueeze(-1).to(torch.float32))
+
+            # Predicting rewards
+            reward_predictions_input = torch.cat((observation_encodings, action_encodings), dim=-1)
+            reward_predictions = self.reward_predictor(reward_predictions_input)
+
+        return reward_predictions.cpu().numpy()
+    
+    def _training_forward(self, observations: torch.Tensor, actions: torch.Tensor):
+        """Forward pass of the reward predictor.
+
+        Args:
             observations (torch.Tensor): Input observations.
             actions (torch.Tensor): Input actions.
 
@@ -132,7 +155,7 @@ class CnnRewardPredictor(nn.Module):
 
         return reward_predictions
 
-    def train(self, observations, actions, rewards, batch_size, mini_batch_size=4, num_training_epochs=4):
+    def train(self, segment_1: Segment, segment_2: Segment, preference: float):
         """Train the reward predictor model.
 
         Args:
@@ -146,40 +169,30 @@ class CnnRewardPredictor(nn.Module):
         Returns:
             dict: Training statistics.
         """
-        # Flatten the data
-        flattened_observations = observations.reshape((-1,) + self.observation_shape)
-        flattened_actions = actions.reshape((-1,) + tuple() if isinstance(self.action_shape, int) else self.action_shape)
-        flattened_rewards = rewards.reshape(-1)
+        assert preference in (0, 0.5, 1), "Invalid preference value"
 
-        batch_indices = np.arange(batch_size)
+        # Calculating sum of latent rewards for both segments
+        segment_1_rewards = self._training_forward(torch.tensor(segment_1.observations).to(self.device),
+                                                   torch.tensor(segment_1.actions).to(self.device))
+        segment_2_rewards = self._training_forward(torch.tensor(segment_2.observations).to(self.device),
+                                                   torch.tensor(segment_2.actions).to(self.device))
+        segment_1_latent_rewards_sum = torch.sum(segment_1_rewards).item()
+        segment_2_latent_rewards_sum = torch.sum(segment_2_rewards).item()
 
-        total_loss = 0.0
-        total_samples = 0
+        # Calculating probability of preference of a segment
+        prob_prefer_segment_1 = math.exp(segment_1_latent_rewards_sum) / math.exp(segment_1_latent_rewards_sum) + math.exp(segment_2_latent_rewards_sum)
+        prob_prefer_segment_2 = math.exp(segment_2_latent_rewards_sum) / math.exp(segment_1_latent_rewards_sum) + math.exp(segment_2_latent_rewards_sum)
 
-        for epoch in range(num_training_epochs):
-            np.random.shuffle(batch_indices)
+        # Calculating loss
+        loss = self.loss_fn(prob_prefer_segment_1, prob_prefer_segment_2, preference)
 
-            for start in range(0, batch_size, mini_batch_size):
-                end = start + mini_batch_size
-                mini_batch_indices = batch_indices[start:end]
-                self.optimizer.zero_grad()
-                reward_predictions = self.forward(
-                    flattened_observations[mini_batch_indices],
-                    flattened_actions.long()[mini_batch_indices]
-                )
-                loss = self.loss_fn(reward_predictions.squeeze(), flattened_rewards[mini_batch_indices])
-                loss.backward()
-                self.optimizer.step()
-                total_loss += loss.item()
-                total_samples += 1
-
-            # self.scheduler.step()
-
-        avg_loss = total_loss / total_samples
+        # Updating gradients
+        loss.backward()
+        self.optimizer.step()
 
         # Training statistics
         training_stats = {
-            'avg_loss': avg_loss
+            'loss': loss.item()
         }
 
         return training_stats
