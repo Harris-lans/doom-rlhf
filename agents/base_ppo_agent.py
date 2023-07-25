@@ -138,7 +138,7 @@ class BasePpoAgent(nn.Module):
         self.critic.load_state_dict(critic_state_dict)
         print("Successfully updated networks!")
 
-    def forward(self, observations, actions=None):
+    def forward(self, observations):
         """
         Compute the optimal action and corresponding value for a given observation.
 
@@ -152,7 +152,7 @@ class BasePpoAgent(nn.Module):
             torch.Tensor: The entropy of the action distribution.
             torch.Tensor: The value estimation.
         """
-        observations = observations if torch.is_tensor(observations) else torch.tensor(observations).to(self.device)
+        observations = torch.tensor(observations).to(self.device)
 
         with torch.no_grad():
             hidden = self.network(observations / 255.0)
@@ -166,7 +166,7 @@ class BasePpoAgent(nn.Module):
 
         return actions.cpu().numpy(), log_probs.cpu().numpy(), probs.cpu().numpy(), value.cpu().numpy()
     
-    def _training_forward(self, observations, actions):
+    def _training_forward(self, observations: torch.Tensor, actions: torch.Tensor):
         """
         Compute the optimal action and corresponding value for a given observation.
 
