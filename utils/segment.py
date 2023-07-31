@@ -1,7 +1,8 @@
 import numpy as np
+import gymnasium as gym
 
 class Segment:
-    def __init__(self, num_steps: int, observation_space, action_space):
+    def __init__(self, num_steps: int, raw_observation_space: gym.spaces.Box, processed_observation_space: gym.spaces.Box, action_space: gym.spaces.Discrete):
         """
         Initializes a Segment object.
 
@@ -13,7 +14,8 @@ class Segment:
             action_space: gym.Space
                 The action space of the environment.
         """
-        self.observations = np.zeros((num_steps,) + observation_space.shape, dtype=observation_space.dtype)
+        self.raw_observations = np.zeros((num_steps,) + raw_observation_space.shape, dtype=raw_observation_space.dtype)
+        self.processed_observations = np.zeros((num_steps,) + processed_observation_space.shape, dtype=processed_observation_space.dtype)
         self.actions = np.zeros((num_steps,) + action_space.shape, dtype=action_space.dtype)
         self.log_probs = np.zeros((num_steps,), dtype=np.float32)
         self.rewards = np.zeros((num_steps,), dtype=np.float32)
@@ -33,41 +35,56 @@ class Segment:
             tuple
                 A tuple containing observation, action, log probability, reward, value, and done status at the specified index.
         """
-        return self.observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
+        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
+
+    def __getitem__(self, index):
+        """
+        Get the data at the specified index in the ReplayBuffer.
+
+        Parameters:
+            index: int
+                The index of the data to retrieve.
+
+        Returns:
+            tuple
+                A tuple containing observations, actions, log probabilities, rewards, values, and done flags at the specified index.
+        """
+        return self.raw_observations[index], self.pre_processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
 
     def __setitem__(self, index, value):
         """
-        Sets the data at the specified index in the segment.
+        Set the data at the specified index in the ReplayBuffer.
 
         Parameters:
             index: int
                 The index where the data will be set.
             value: tuple
-                A tuple containing observation, action, log probability, reward, value, and done status to be set at the specified index.
+                A tuple containing observations, actions, log probabilities, rewards, values, and done flags to be set at the specified index.
         """
-        self.observations[index] = value[0]
-        self.actions[index] = value[1]
-        self.log_probs[index] = value[2]
-        self.rewards[index] = value[3]
-        self.values[index] = value[4]
-        self.dones[index] = value[5]
+        self.raw_observations[index] = value[0]
+        self.pre_processed_observations[index] = value[1]
+        self.actions[index] = value[2]
+        self.log_probs[index] = value[3]
+        self.rewards[index] = value[4]
+        self.values[index] = value[5]
+        self.dones[index] = value[6]
 
     def __len__(self):
         """
-        Returns the number of steps in the segment.
+        Get the number of steps in the ReplayBuffer.
 
         Returns:
             int
-                The number of steps in the segment.
+                The number of steps in the ReplayBuffer.
         """
         return self.num_steps
 
     def __iter__(self):
         """
-        Initializes the iterator for the segment.
+        Initialize the iterator for the ReplayBuffer.
 
         Returns:
-            Segment
+            ReplayBuffer
                 The iterator object.
         """
         self.index = 0
@@ -75,17 +92,17 @@ class Segment:
 
     def __next__(self):
         """
-        Returns the next data in the segment during iteration.
+        Get the next data in the ReplayBuffer during iteration.
 
         Returns:
             tuple
-                A tuple containing observation, action, log probability, reward, value, and done status.
+                A tuple containing observations, actions, log probabilities, rewards, values, and done flags.
         Raises:
             StopIteration
                 When the iteration is complete.
         """
         if self.index < self.num_steps:
-            result = (self.observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.dones[self.index])
+            result = (self.raw_observations[self.index], self.pre_processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.dones[self.index])
             self.index += 1
             return result
         else:

@@ -1,8 +1,9 @@
 import numpy as np
 from utils.segment import Segment
+import gymnasium as gym
 
 class ReplayBuffer:
-    def __init__(self, num_steps, num_envs, observation_space, action_space):
+    def __init__(self, num_steps: int, num_envs: int, raw_observation_space: gym.spaces.Box, processed_observation_space: gym.spaces.Box, action_space: gym.spaces.Discrete):
         """
         Initialize the ReplayBuffer.
 
@@ -11,20 +12,22 @@ class ReplayBuffer:
                 The number of steps in each environment trajectory.
             num_envs: int
                 The number of parallel environments (usually the batch size).
-            observation_space: gym.Space
+            processed_observation_space: gym.Space
                 The observation space of the environment.
             action_space: gym.Space
                 The action space of the environment.
         """
-        self.observations = np.zeros((num_steps, num_envs) + observation_space.shape, dtype=observation_space.dtype)
+        self.raw_observations = np.zeros((num_steps, num_envs) + raw_observation_space.shape, dtype=raw_observation_space.dtype)
+        self.processed_observations = np.zeros((num_steps, num_envs) + processed_observation_space.shape, dtype=processed_observation_space.dtype)
         self.actions = np.zeros((num_steps, num_envs) + action_space.shape, dtype=action_space.dtype)
         self.log_probs = np.zeros((num_steps, num_envs), dtype=np.float32)
         self.rewards = np.zeros((num_steps, num_envs), dtype=np.float32)
         self.values = np.zeros((num_steps, num_envs), dtype=np.float32)
         self.dones = np.zeros((num_steps, num_envs), dtype=np.int8)
+        
         self.num_steps = num_steps
         self.num_envs = num_envs
-        self.observation_space = observation_space
+        self.observation_space = processed_observation_space
         self.action_space = action_space
     
     def __getitem__(self, index):
@@ -39,7 +42,7 @@ class ReplayBuffer:
             tuple
                 A tuple containing observations, actions, log probabilities, rewards, values, and done flags at the specified index.
         """
-        return self.observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
+        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
 
     def __setitem__(self, index, value):
         """
@@ -51,12 +54,13 @@ class ReplayBuffer:
             value: tuple
                 A tuple containing observations, actions, log probabilities, rewards, values, and done flags to be set at the specified index.
         """
-        self.observations[index] = value[0]
-        self.actions[index] = value[1]
-        self.log_probs[index] = value[2]
-        self.rewards[index] = value[3]
-        self.values[index] = value[4]
-        self.dones[index] = value[5]
+        self.raw_observations[index] = value[0]
+        self.processed_observations[index] = value[1]
+        self.actions[index] = value[2]
+        self.log_probs[index] = value[3]
+        self.rewards[index] = value[4]
+        self.values[index] = value[5]
+        self.dones[index] = value[6]
 
     def __len__(self):
         """
@@ -91,7 +95,7 @@ class ReplayBuffer:
                 When the iteration is complete.
         """
         if self.index < self.num_steps:
-            result = (self.observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.dones[self.index])
+            result = (self.raw_observations[self.index], self.processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.dones[self.index])
             self.index += 1
             return result
         else:
@@ -108,7 +112,8 @@ class ReplayBuffer:
                     segment = Segment(num_steps_in_segment, self.observation_space, self.action_space)
                     segment_step = 0
                     for buffer_step in range(current_segment_start_step, step):
-                        segment[segment_step] = (self.observations[buffer_step][env], 
+                        segment[segment_step] = (self.raw_observations[buffer_step][env], 
+                                                 self.processed_observations[buffer_step][env],
                                                  self.actions[buffer_step][env],
                                                  self.log_probs[buffer_step][env],
                                                  self.rewards[buffer_step][env],

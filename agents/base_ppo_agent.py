@@ -241,7 +241,7 @@ class BasePpoAgent(nn.Module):
             self.optimizer.param_groups[0]["lr"] = lrnow
 
         # Convert replay buffer data into tensors
-        observations = torch.Tensor(replay_buffer.observations).to(self.device)
+        observations = torch.Tensor(replay_buffer.processed_observations).to(self.device)
         actions = torch.Tensor(replay_buffer.actions).to(self.device)
         log_probs = torch.Tensor(replay_buffer.log_probs).to(self.device)
         rewards = torch.Tensor(replay_buffer.rewards).to(self.device)

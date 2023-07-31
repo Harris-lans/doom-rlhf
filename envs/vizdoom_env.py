@@ -119,6 +119,7 @@ class VizdoomEnv(gym.Env, EzPickle):
 
         # specify observation space(s)
         self.observation_space = self.__get_observation_space()
+        self.raw_observation_space = self.__get_observation_space()
 
         self.game.init()
 
