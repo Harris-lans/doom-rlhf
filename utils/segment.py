@@ -23,6 +23,10 @@ class Segment:
         self.dones = np.zeros((num_steps,), dtype=np.uint8)
         self.num_steps = num_steps
 
+        self.raw_observation_space = raw_observation_space
+        self.processed_observation_space = processed_observation_space
+        self.action_space = action_space
+
     def __getitem__(self, index):
         """
         Returns the data at the specified index in the segment.
@@ -49,7 +53,7 @@ class Segment:
             tuple
                 A tuple containing observations, actions, log probabilities, rewards, values, and done flags at the specified index.
         """
-        return self.raw_observations[index], self.pre_processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
+        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
 
     def __setitem__(self, index, value):
         """
@@ -62,7 +66,7 @@ class Segment:
                 A tuple containing observations, actions, log probabilities, rewards, values, and done flags to be set at the specified index.
         """
         self.raw_observations[index] = value[0]
-        self.pre_processed_observations[index] = value[1]
+        self.processed_observations[index] = value[1]
         self.actions[index] = value[2]
         self.log_probs[index] = value[3]
         self.rewards[index] = value[4]
@@ -102,7 +106,7 @@ class Segment:
                 When the iteration is complete.
         """
         if self.index < self.num_steps:
-            result = (self.raw_observations[self.index], self.pre_processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.dones[self.index])
+            result = (self.raw_observations[self.index], self.processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.dones[self.index])
             self.index += 1
             return result
         else:

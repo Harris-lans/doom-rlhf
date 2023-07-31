@@ -27,7 +27,8 @@ class ReplayBuffer:
         
         self.num_steps = num_steps
         self.num_envs = num_envs
-        self.observation_space = processed_observation_space
+        self.raw_observation_space = raw_observation_space
+        self.processed_observation_space = processed_observation_space
         self.action_space = action_space
     
     def __getitem__(self, index):
@@ -109,7 +110,10 @@ class ReplayBuffer:
             for step in range(self.num_steps):
                 num_steps_in_segment = step - current_segment_start_step
                 if self.dones[step][env] == 1 or step == self.num_steps - 1 or num_steps_in_segment >= max_episodic_length:
-                    segment = Segment(num_steps_in_segment, self.observation_space, self.action_space)
+                    segment = Segment(num_steps_in_segment, 
+                                      self.raw_observation_space, 
+                                      self.processed_observation_space, 
+                                      self.action_space)
                     segment_step = 0
                     for buffer_step in range(current_segment_start_step, step):
                         segment[segment_step] = (self.raw_observations[buffer_step][env], 
