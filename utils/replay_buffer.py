@@ -105,17 +105,22 @@ class ReplayBuffer:
     def get_episodic_segments(self, max_episodic_length: int):
         segments = []
 
+        # Looping through all the steps, one environment at a time
         for env in range(self.num_envs):
             current_segment_start_step = 0
             for step in range(self.num_steps):
-                num_steps_in_segment = step - current_segment_start_step
+                num_steps_in_segment = step - current_segment_start_step + 1
                 if self.dones[step][env] == 1 or step == self.num_steps - 1 or num_steps_in_segment >= max_episodic_length:
+                    print(f"env = {env}")
+                    print(f"step = {step}")
+                    print(f"current_segment_start_step = {current_segment_start_step}")
+                    print(f"num_steps_in_segment = {num_steps_in_segment}")
                     segment = Segment(num_steps_in_segment, 
                                       self.raw_observation_space, 
                                       self.processed_observation_space, 
                                       self.action_space)
                     segment_step = 0
-                    for buffer_step in range(current_segment_start_step, step):
+                    for buffer_step in range(current_segment_start_step, step + 1):
                         segment[segment_step] = (self.raw_observations[buffer_step][env], 
                                                  self.processed_observations[buffer_step][env],
                                                  self.actions[buffer_step][env],
