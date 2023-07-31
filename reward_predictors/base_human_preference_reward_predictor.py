@@ -152,12 +152,8 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         assert preference in (0, 0.5, 1), "Invalid preference value"
 
         # Calculating sum of latent rewards for both segments
-        segment_1_rewards = self._training_forward(torch.tensor(segment_1.observations).to(self.device),
-                                                   torch.tensor(segment_1.actions).to(self.device))
-        segment_2_rewards = self._training_forward(torch.tensor(segment_2.observations).to(self.device),
-                                                   torch.tensor(segment_2.actions).to(self.device))
-        segment_1_latent_rewards_sum = torch.sum(segment_1_rewards).item()
-        segment_2_latent_rewards_sum = torch.sum(segment_2_rewards).item()
+        segment_1_latent_rewards_sum = np.sum(segment_1.rewards).item()
+        segment_2_latent_rewards_sum = np.sum(segment_2.rewards).item()
 
         # Calculating probability of preference of a segment
         prob_prefer_segment_1 = math.exp(segment_1_latent_rewards_sum) / math.exp(segment_1_latent_rewards_sum) + math.exp(segment_2_latent_rewards_sum)

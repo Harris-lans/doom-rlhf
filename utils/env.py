@@ -1,9 +1,9 @@
 import gymnasium as gym
-from envs.doom_env import DoomEnv
 from envs.vizdoom_env import VizdoomEnv
-from utils.time import current_timestamp_ms
+from utils.replay_buffer import ReplayBuffer
+from envs.wrappers.record_replay_buffer import RecordReplayBuffer
 
-def make_vizdoom_env(level: str, render_mode=None, frame_stack_size=4, record_episodes=False, recording_save_path=f"videos/{current_timestamp_ms()}", recording_file_prefix=f"vizdoom"):
+def make_vizdoom_env(level: str, env_id=0, unprocessed_frames_replay_buffer: ReplayBuffer = None, render_mode=None, frame_stack_size=4):
     """Factory function to create a Doom environment with specified configurations.
 
     Args:
@@ -19,10 +19,11 @@ def make_vizdoom_env(level: str, render_mode=None, frame_stack_size=4, record_ep
         env = VizdoomEnv(level, render_mode=render_mode)
 
         env = gym.wrappers.RecordEpisodeStatistics(env)
-        if record_episodes:
-            env = gym.wrappers.RecordVideo(env, recording_save_path, name_prefix=recording_file_prefix, disable_logger=False)
+        # Recording transitions with unprocessed transitions
+        if unprocessed_frames_replay_buffer is not None:
+            env = RecordReplayBuffer(env, env_id, unprocessed_frames_replay_buffer)
 
-        # Observation wrappers
+        # Observation Pre-Processing Wrappers
         env = gym.wrappers.ResizeObservation(env, (120, 160))
         env = gym.wrappers.GrayScaleObservation(env)
         env = gym.wrappers.FrameStack(env, frame_stack_size)
