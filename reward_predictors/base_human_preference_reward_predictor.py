@@ -135,7 +135,7 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
 
         return reward_predictions
 
-    def train(self, segment_1: Segment, segment_2: Segment, preference: float):
+    def train(self, segment_1: Segment, segment_2: Segment, preference: float, epochs: int = 4):
         """Train the reward predictor model.
 
         Args:
@@ -151,24 +151,36 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         """
         assert preference in (0, 0.5, 1), "Invalid preference value"
 
-        # Calculating sum of latent rewards for both segments
-        segment_1_latent_rewards_sum = np.sum(segment_1.rewards).item()
-        segment_2_latent_rewards_sum = np.sum(segment_2.rewards).item()
+        total_loss = 0
 
-        # Calculating probability of preference of a segment
-        prob_prefer_segment_1 = math.exp(segment_1_latent_rewards_sum) / math.exp(segment_1_latent_rewards_sum) + math.exp(segment_2_latent_rewards_sum)
-        prob_prefer_segment_2 = math.exp(segment_2_latent_rewards_sum) / math.exp(segment_1_latent_rewards_sum) + math.exp(segment_2_latent_rewards_sum)
+        for i in range(epochs):
+            # Resetting gradients
+            self.optimizer.zero_grad()
 
-        # Calculating loss
-        loss = self.loss_fn(prob_prefer_segment_1, prob_prefer_segment_2, preference)
+            # Calculating sum of latent rewards for both segments
+            segment_1_rewards = self._training_forward(torch.tensor(segment_1.observations).to(self.device),
+                                                    torch.tensor(segment_1.actions).to(self.device))
+            segment_2_rewards = self._training_forward(torch.tensor(segment_2.observations).to(self.device),
+                                                    torch.tensor(segment_2.actions).to(self.device))
+            segment_1_latent_rewards_sum = torch.sum(segment_1_rewards).item()
+            segment_2_latent_rewards_sum = torch.sum(segment_2_rewards).item()
 
-        # Updating gradients
-        loss.backward()
-        self.optimizer.step()
+            # Calculating probability of preference of the segments
+            prob_prefer_segment_1 = math.exp(segment_1_latent_rewards_sum) / math.exp(segment_1_latent_rewards_sum) + math.exp(segment_2_latent_rewards_sum)
+            prob_prefer_segment_2 = math.exp(segment_2_latent_rewards_sum) / math.exp(segment_1_latent_rewards_sum) + math.exp(segment_2_latent_rewards_sum)
+
+            # Calculating loss
+            loss = self.loss_fn(prob_prefer_segment_1, prob_prefer_segment_2, preference)
+
+            # Updating gradients
+            loss.backward()
+            self.optimizer.step()
+
+            total_loss += loss.item()
 
         # Training statistics
         training_stats = {
-            'loss': loss.item()
+            'loss': total_loss / epochs
         }
 
         return training_stats

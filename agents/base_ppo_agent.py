@@ -95,21 +95,14 @@ class BasePpoAgent(nn.Module):
         Parameters:
             path (str): The path to the directory where models will be saved.
         """
-        print("Saving models...")
-
         # Creating directory if it doesn't exist
         if not os.path.exists(path):
             os.makedirs(path)
-            print(f"Directory '{path}' created!")
-        else:
-            print(f"Directory '{path}' already exists!")
 
         # Saving network states
         torch.save(self.network.state_dict(), f"{path}/base.pth")
         torch.save(self.actor.state_dict(), f"{path}/actor.pth")
         torch.save(self.critic.state_dict(), f"{path}/critic.pth")
-
-        print("Successfully saved models!")
 
     def load_models(self, path):
         """
