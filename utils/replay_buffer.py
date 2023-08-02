@@ -109,14 +109,14 @@ class ReplayBuffer:
         for env in range(self.num_envs):
             current_segment_start_step = 0
             for step in range(self.num_steps):
-                num_steps_in_segment = step - current_segment_start_step + 1
+                num_steps_in_segment = step - current_segment_start_step
                 if self.dones[step][env] == 1 or step == self.num_steps - 1 or num_steps_in_segment >= max_episodic_length:
                     segment = Segment(num_steps_in_segment, 
                                       self.raw_observation_space, 
                                       self.processed_observation_space, 
                                       self.action_space)
                     segment_step = 0
-                    for buffer_step in range(current_segment_start_step, step + 1):
+                    for buffer_step in range(current_segment_start_step, step):
                         segment[segment_step] = (self.raw_observations[buffer_step][env], 
                                                  self.processed_observations[buffer_step][env],
                                                  self.actions[buffer_step][env],
@@ -127,6 +127,6 @@ class ReplayBuffer:
                         segment_step += 1
                     segments.append(segment)
 
-                    current_segment_start_step = step + 1
+                    current_segment_start_step = step
 
         return segments

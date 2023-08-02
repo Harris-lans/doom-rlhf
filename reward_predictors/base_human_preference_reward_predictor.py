@@ -4,7 +4,6 @@ import numpy as np
 import os
 from losses.preference_loss import PreferenceLoss
 from utils.segment import Segment
-import math
 from typing import Tuple
 
 class BaseHumanPreferenceRewardPredictor(nn.Module):
@@ -126,7 +125,7 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
             torch.Tensor: Predicted rewards.
         """
         # Calculating observation and action encodings
-        observation_encodings = self.observation_encoder(observations)
+        observation_encodings = self.observation_encoder(observations / 255.0)
         action_encodings = self.action_encoder(actions.unsqueeze(-1).to(torch.float32))
 
         # Predicting rewards
@@ -154,24 +153,36 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         total_loss = 0
 
         for i in range(epochs):
-            # Resetting gradients
-            self.optimizer.zero_grad()
-
             # Calculating sum of latent rewards for both segments
-            segment_1_rewards = self._training_forward(torch.tensor(segment_1.observations).to(self.device),
+            segment_1_rewards = self._training_forward(torch.tensor(segment_1.processed_observations).to(self.device),
                                                     torch.tensor(segment_1.actions).to(self.device))
-            segment_2_rewards = self._training_forward(torch.tensor(segment_2.observations).to(self.device),
+            segment_2_rewards = self._training_forward(torch.tensor(segment_2.processed_observations).to(self.device),
                                                     torch.tensor(segment_2.actions).to(self.device))
-            segment_1_latent_rewards_sum = torch.sum(segment_1_rewards).item()
-            segment_2_latent_rewards_sum = torch.sum(segment_2_rewards).item()
+            segment_1_latent_rewards_sum = torch.sum(segment_1_rewards)
+            segment_2_latent_rewards_sum = torch.sum(segment_2_rewards)
 
             # Calculating probability of preference of the segments
-            prob_prefer_segment_1 = math.exp(segment_1_latent_rewards_sum) / math.exp(segment_1_latent_rewards_sum) + math.exp(segment_2_latent_rewards_sum)
-            prob_prefer_segment_2 = math.exp(segment_2_latent_rewards_sum) / math.exp(segment_1_latent_rewards_sum) + math.exp(segment_2_latent_rewards_sum)
+            prob_prefer_segment_1 = torch.exp(segment_1_latent_rewards_sum) / (torch.exp(segment_1_latent_rewards_sum) + torch.exp(segment_2_latent_rewards_sum))
+            prob_prefer_segment_2 = torch.exp(segment_2_latent_rewards_sum) / (torch.exp(segment_1_latent_rewards_sum) + torch.exp(segment_2_latent_rewards_sum))
+
+            if preference == 0:
+                mu1 = 1
+                mu2 = 0
+            elif preference == 0.5:
+                mu1 = 0.5
+                mu2 = 0.5
+            else:
+                mu1 = 0
+                mu2 = 1
+
+            mu1 = torch.tensor(mu1).to(self.device)
+            mu2 = torch.tensor(mu2).to(self.device)
 
             # Calculating loss
-            loss = self.loss_fn(prob_prefer_segment_1, prob_prefer_segment_2, preference)
+            loss = self.loss_fn(prob_prefer_segment_1, prob_prefer_segment_2, mu1, mu2)
 
+            # Resetting gradients
+            self.optimizer.zero_grad()
             # Updating gradients
             loss.backward()
             self.optimizer.step()
