@@ -6,6 +6,8 @@ from losses.preference_loss import PreferenceLoss
 from utils.segment import Segment
 from typing import Tuple
 
+FLOAT_EPSILON = 1e-8
+
 class BaseHumanPreferenceRewardPredictor(nn.Module):
     """A convolutional neural network model for reward prediction.
 
@@ -155,11 +157,15 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         for i in range(epochs):
             # Calculating sum of latent rewards for both segments
             segment_1_rewards = self._training_forward(torch.tensor(segment_1.processed_observations).to(self.device),
-                                                    torch.tensor(segment_1.actions).to(self.device))
+                                                       torch.tensor(segment_1.actions).to(self.device))
             segment_2_rewards = self._training_forward(torch.tensor(segment_2.processed_observations).to(self.device),
-                                                    torch.tensor(segment_2.actions).to(self.device))
+                                                       torch.tensor(segment_2.actions).to(self.device))
             segment_1_latent_rewards_sum = torch.sum(segment_1_rewards)
             segment_2_latent_rewards_sum = torch.sum(segment_2_rewards)
+
+            # Adding a small epsilon value to prevent NaN values during the training process
+            segment_1_latent_rewards_sum += torch.tensor(FLOAT_EPSILON).to(self.device)
+            segment_2_latent_rewards_sum += torch.tensor(FLOAT_EPSILON).to(self.device)
 
             # Calculating probability of preference of the segments
             prob_prefer_segment_1 = torch.exp(segment_1_latent_rewards_sum) / (torch.exp(segment_1_latent_rewards_sum) + torch.exp(segment_2_latent_rewards_sum))
