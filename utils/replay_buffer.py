@@ -130,3 +130,33 @@ class ReplayBuffer:
                     current_segment_start_step = step
 
         return segments
+    
+    def get_segments(self, segment_length: int):
+        segments = []
+
+        # Looping through all the steps, one environment at a time
+        for env in range(self.num_envs):
+            current_segment_start_step = 0
+            for step in range(self.num_steps):
+                num_steps_in_segment = step - current_segment_start_step
+                if step % segment_length == 0:
+                    # Creating new segment
+                    segment = Segment(num_steps_in_segment, 
+                                      self.raw_observation_space, 
+                                      self.processed_observation_space, 
+                                      self.action_space)
+                    for buffer_step in range(current_segment_start_step, step):
+                        segment_step = current_segment_start_step % segment_length
+                        segment[segment_step] = (self.raw_observations[buffer_step][env], 
+                                                 self.processed_observations[buffer_step][env],
+                                                 self.actions[buffer_step][env],
+                                                 self.log_probs[buffer_step][env],
+                                                 self.rewards[buffer_step][env],
+                                                 self.values[buffer_step][env],
+                                                 self.dones[buffer_step][env])
+                    segments.append(segment)
+
+                    # Updating current segment step
+                    current_segment_start_step = step
+
+        return segments

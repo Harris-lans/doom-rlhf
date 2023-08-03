@@ -4,6 +4,7 @@ import numpy as np
 import os
 from losses.preference_loss import PreferenceLoss
 from utils.segment import Segment
+from utils.running_stat import RunningStat
 from typing import Tuple
 
 FLOAT_EPSILON = 1e-8
@@ -44,6 +45,8 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
 
         # Running the agent on the device
         self.to(self.device)
+
+        self.running_stat = RunningStat(self.device)
 
     def save_models(self, path='./models'):
         """Save the model's weights to a file.
@@ -91,7 +94,15 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         self.reward_predictor.load_state_dict(model_dict['reward_predictor'])
         print("Successfully updated networks!")
 
-    def forward(self, observations, actions):
+    def _normalize_rewards(self, rewards: torch.Tensor):
+        # Normalizing rewards
+        rewards -= self.running_stat.mean
+        rewards /= (self.running_stat.std + torch.tensor(FLOAT_EPSILON).to(self.device))
+        rewards *= torch.tensor(0.05).to(self.device)
+
+        return rewards
+
+    def forward(self, observations: np.ndarray, actions: np.ndarray):
         """Forward pass of the reward predictor.
 
         Args:
@@ -108,13 +119,19 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
             # Calculating observation and action encodings
             observation_encodings = self.observation_encoder(observations / 255.0)
             action_encodings = self.action_encoder(actions.unsqueeze(-1).to(torch.float32))
-            # action_encodings = self.action_encoder(actions.to(torch.float32))
 
             # Predicting rewards
             reward_predictions_input = torch.cat((observation_encodings, action_encodings), dim=-1)
             reward_predictions = self.reward_predictor(reward_predictions_input)
+            reward_predictions = reward_predictions.squeeze()
 
-        return reward_predictions.squeeze().cpu().numpy()
+            # Pushing calculated reward prediction to running stat
+            for reward_prediction in reward_predictions:
+                self.running_stat.push(reward_prediction)
+
+            reward_predictions = self._normalize_rewards(reward_predictions)
+
+        return reward_predictions.cpu().numpy()
     
     def _training_forward(self, observations: torch.Tensor, actions: torch.Tensor):
         """Forward pass of the reward predictor.
@@ -133,6 +150,7 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         # Predicting rewards
         reward_predictions_input = torch.cat((observation_encodings, action_encodings), dim=-1)
         reward_predictions = self.reward_predictor(reward_predictions_input)
+        reward_predictions = self._normalize_rewards(reward_predictions)
 
         return reward_predictions
 
