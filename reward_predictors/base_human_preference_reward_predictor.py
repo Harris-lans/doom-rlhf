@@ -136,7 +136,7 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
 
         return reward_predictions
 
-    def train(self, segment_1: Segment, segment_2: Segment, preference: float, epochs: int = 4):
+    def train(self, segment_1: Segment, segment_2: Segment, preference: float, epochs: int = 1):
         """Train the reward predictor model.
 
         Args:
