@@ -1,6 +1,5 @@
 from reward_predictors.base_human_preference_reward_predictor import BaseHumanPreferenceRewardPredictor
-from utils.networks import ppo_layer_init
-from gymnasium.spaces import Discrete, Space
+from gymnasium.spaces import Space
 import torch.nn as nn
 
 class DoomHumanPreferenceRewardPredictor(BaseHumanPreferenceRewardPredictor):
@@ -41,8 +40,10 @@ class DoomHumanPreferenceRewardPredictor(BaseHumanPreferenceRewardPredictor):
 
             nn.Flatten(),
             nn.Linear(64 * 11 * 16, hidden_size),
+            nn.LeakyReLU(negative_slope=0.01),
+            nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, 1)
-        )
+        )   
 
         super().__init__(network, observation_space.shape, learning_rate, use_gpu)
