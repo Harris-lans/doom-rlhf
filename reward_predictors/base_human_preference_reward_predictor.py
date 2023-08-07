@@ -21,18 +21,14 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         use_gpu (bool, optional): Whether to use GPU if available. Defaults to True.
     """
 
-    def __init__(self, observation_encoder: nn.Sequential, action_encoder: nn.Sequential, reward_predictor: nn.Sequential, observation_shape: Tuple[int, ...], action_shape: Tuple[int, ...], learning_rate=1e-3, use_gpu=True):
+    def __init__(self, network: nn.Sequential, observation_shape: Tuple[int, ...], learning_rate=1e-3, use_gpu=True):
         super(BaseHumanPreferenceRewardPredictor, self).__init__()
 
         self.observation_shape = observation_shape
-        self.action_shape = action_shape
 
-        self.observation_encoder = observation_encoder
-        self.action_encoder = action_encoder
-        self.reward_predictor = reward_predictor
+        self.network = network
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.1)
         self.loss_fn = PreferenceLoss()
 
         # Choosing the device to run agent on
@@ -65,9 +61,7 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
 
         # Saving network states
         torch.save({
-            'observation_encoder': self.observation_encoder.state_dict(),
-            'action_encoder': self.action_encoder.state_dict(),
-            'reward_predictor': self.reward_predictor.state_dict()
+            'network': self.network.state_dict(),
         }, f"{path}/reward_predictor.pth")
 
         print("Successfully saved models!")
@@ -89,9 +83,7 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
 
         # Updating networks with loaded models
         print("Updating networks with weights from loaded models...")
-        self.observation_encoder.load_state_dict(model_dict['observation_encoder'])
-        self.action_encoder.load_state_dict(model_dict['action_encoder'])
-        self.reward_predictor.load_state_dict(model_dict['reward_predictor'])
+        self.network.load_state_dict(model_dict['network'])
         print("Successfully updated networks!")
 
     def _normalize_rewards(self, rewards: torch.Tensor):
@@ -102,7 +94,7 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
 
         return rewards
 
-    def forward(self, observations: np.ndarray, actions: np.ndarray):
+    def forward(self, observations: np.ndarray):
         """Forward pass of the reward predictor.
 
         Args:
@@ -113,27 +105,21 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
             torch.Tensor: Predicted rewards.
         """
         observations = torch.tensor(observations).to(self.device)
-        actions = torch.tensor(actions).to(self.device)
 
         with torch.no_grad():
-            # Calculating observation and action encodings
-            observation_encodings = self.observation_encoder(observations / 255.0)
-            action_encodings = self.action_encoder(actions.unsqueeze(-1).to(torch.float32))
-
             # Predicting rewards
-            reward_predictions_input = torch.cat((observation_encodings, action_encodings), dim=-1)
-            reward_predictions = self.reward_predictor(reward_predictions_input)
-            reward_predictions = reward_predictions.squeeze()
+            reward_predictions = self.network(observations / 255.0)
 
             # Pushing calculated reward prediction to running stat
             for reward_prediction in reward_predictions:
                 self.running_stat.push(reward_prediction)
 
+            # Normalizing rewards
             reward_predictions = self._normalize_rewards(reward_predictions)
 
         return reward_predictions.cpu().numpy()
     
-    def _training_forward(self, observations: torch.Tensor, actions: torch.Tensor):
+    def _training_forward(self, observations: torch.Tensor):
         """Forward pass of the reward predictor.
 
         Args:
@@ -143,13 +129,14 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         Returns:
             torch.Tensor: Predicted rewards.
         """
-        # Calculating observation and action encodings
-        observation_encodings = self.observation_encoder(observations / 255.0)
-        action_encodings = self.action_encoder(actions.unsqueeze(-1).to(torch.float32))
-
         # Predicting rewards
-        reward_predictions_input = torch.cat((observation_encodings, action_encodings), dim=-1)
-        reward_predictions = self.reward_predictor(reward_predictions_input)
+        reward_predictions = self.network(observations / 255.0)
+
+        # Pushing calculated reward prediction to running stat
+        for reward_prediction in reward_predictions:
+            self.running_stat.push(reward_prediction)
+
+        # Normalizing rewards
         reward_predictions = self._normalize_rewards(reward_predictions)
 
         return reward_predictions
@@ -174,10 +161,8 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
 
         for i in range(epochs):
             # Calculating sum of latent rewards for both segments
-            segment_1_rewards = self._training_forward(torch.tensor(segment_1.processed_observations).to(self.device),
-                                                       torch.tensor(segment_1.actions).to(self.device))
-            segment_2_rewards = self._training_forward(torch.tensor(segment_2.processed_observations).to(self.device),
-                                                       torch.tensor(segment_2.actions).to(self.device))
+            segment_1_rewards = self._training_forward(torch.tensor(segment_1.processed_observations).to(self.device))
+            segment_2_rewards = self._training_forward(torch.tensor(segment_2.processed_observations).to(self.device))
             segment_1_latent_rewards_sum = torch.sum(segment_1_rewards)
             segment_2_latent_rewards_sum = torch.sum(segment_2_rewards)
 
