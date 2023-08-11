@@ -230,8 +230,8 @@ class BasePpoAgent(nn.Module):
         """
         # Annealing the rate if instructed to do so.
         if learning_rate_anneal_coef is not None:
-            lrnow = learning_rate_anneal_coef * self.learning_rate
-            self.optimizer.param_groups[0]["lr"] = lrnow
+            new_learning_rate = learning_rate_anneal_coef * self.learning_rate
+            self.optimizer.param_groups[0]["lr"] = new_learning_rate
 
         # Convert replay buffer data into tensors
         observations = torch.Tensor(replay_buffer.processed_observations).to(self.device)
