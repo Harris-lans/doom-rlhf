@@ -131,14 +131,6 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         reward_predictions = self.reward_predictor_network(observation_encodings)
         reward_predictions = reward_predictions.squeeze()
 
-        # with torch.no_grad():
-        #     # Pushing calculated reward prediction to running stat
-        #     for reward_prediction in reward_predictions:
-        #         self.running_stat.push(reward_prediction.clone())
-
-        # # Normalizing rewards
-        # reward_predictions = self._normalize_rewards(reward_predictions)
-
         return reward_predictions
 
     def train(self, segment_1: Segment, segment_2: Segment, preference: float, epochs: int = 1):
