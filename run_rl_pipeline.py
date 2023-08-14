@@ -18,8 +18,6 @@ def parse_args():
         help="The learning rate of the optimizer")
     parser.add_argument("--total-timesteps", type=int, default=500000,
         help="Total timesteps to train for")
-    parser.add_argument("--torch-deterministic", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
-        help="If toggled, `torch.backends.cudnn.deterministic=False`")
     parser.add_argument("--enable-gpu", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="If toggled, gpu will be used for training")
     parser.add_argument("--track-stats", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
@@ -83,7 +81,7 @@ envs = gym.vector.SyncVectorEnv([ make_vizdoom_env(args.env_cfg) for i in range(
 agent = DoomPpoAgent(envs.single_observation_space, 
                      envs.single_action_space,
                      learning_rate=args.learning_rate,
-                     use_gpu=args.use_gpu)
+                     use_gpu=args.enable_gpu)
 
 # Creating replay buffer for storing transitions
 replay_buffer = ReplayBuffer(args.num_steps, 
@@ -103,8 +101,11 @@ best_average_return = float('-inf')
 returns = []
 
 for update in range(1, num_updates + 1):
-    # Calculating learning rate annealing coefficient
-    learning_rate_anneal_coef = 1.0 - (update - 1.0) / num_updates
+    if args.anneal_lr:
+        # Calculating learning rate annealing coefficient
+        learning_rate_anneal_coef = 1.0 - (update - 1.0) / num_updates
+    else:
+        learning_rate_anneal_coef = None
 
     for step in range(0, args.num_steps):
         global_step += args.num_envs
@@ -163,7 +164,7 @@ for update in range(1, num_updates + 1):
     training_stats = agent.train(
         replay_buffer=replay_buffer,
         gamma=args.gamma,
-        enable_gae=args.enable_gae,
+        enable_gae=args.gae,
         gae_lambda=args.gae_lambda,
         clip_vloss=args.clip_vloss,
         epsilon=args.epsilon,
@@ -172,7 +173,7 @@ for update in range(1, num_updates + 1):
         entropy_coef=args.entropy_coef,
         learning_rate_anneal_coef=learning_rate_anneal_coef,
         target_kl=args.target_kl,
-        normalize_advantages=args.normalize_advantages,
+        normalize_advantages=args.norm_adv,
         mini_batch_size=mini_batch_size,
         num_training_epochs=args.training_epochs
     )
