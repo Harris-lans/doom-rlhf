@@ -95,21 +95,14 @@ class BasePpoAgent(nn.Module):
         Parameters:
             path (str): The path to the directory where models will be saved.
         """
-        print("Saving models...")
-
         # Creating directory if it doesn't exist
         if not os.path.exists(path):
             os.makedirs(path)
-            print(f"Directory '{path}' created!")
-        else:
-            print(f"Directory '{path}' already exists!")
 
         # Saving network states
         torch.save(self.network.state_dict(), f"{path}/base.pth")
         torch.save(self.actor.state_dict(), f"{path}/actor.pth")
         torch.save(self.critic.state_dict(), f"{path}/critic.pth")
-
-        print("Successfully saved models!")
 
     def load_models(self, path):
         """
@@ -138,7 +131,7 @@ class BasePpoAgent(nn.Module):
         self.critic.load_state_dict(critic_state_dict)
         print("Successfully updated networks!")
 
-    def forward(self, observations, actions=None):
+    def forward(self, observations):
         """
         Compute the optimal action and corresponding value for a given observation.
 
@@ -152,7 +145,7 @@ class BasePpoAgent(nn.Module):
             torch.Tensor: The entropy of the action distribution.
             torch.Tensor: The value estimation.
         """
-        observations = observations if torch.is_tensor(observations) else torch.tensor(observations).to(self.device)
+        observations = torch.tensor(observations).to(self.device)
 
         with torch.no_grad():
             hidden = self.network(observations / 255.0)
@@ -166,7 +159,7 @@ class BasePpoAgent(nn.Module):
 
         return actions.cpu().numpy(), log_probs.cpu().numpy(), probs.cpu().numpy(), value.cpu().numpy()
     
-    def _training_forward(self, observations, actions):
+    def _training_forward(self, observations: torch.Tensor, actions: torch.Tensor):
         """
         Compute the optimal action and corresponding value for a given observation.
 
@@ -237,11 +230,11 @@ class BasePpoAgent(nn.Module):
         """
         # Annealing the rate if instructed to do so.
         if learning_rate_anneal_coef is not None:
-            lrnow = learning_rate_anneal_coef * self.learning_rate
-            self.optimizer.param_groups[0]["lr"] = lrnow
+            new_learning_rate = learning_rate_anneal_coef * self.learning_rate
+            self.optimizer.param_groups[0]["lr"] = new_learning_rate
 
         # Convert replay buffer data into tensors
-        observations = torch.Tensor(replay_buffer.observations).to(self.device)
+        observations = torch.Tensor(replay_buffer.processed_observations).to(self.device)
         actions = torch.Tensor(replay_buffer.actions).to(self.device)
         log_probs = torch.Tensor(replay_buffer.log_probs).to(self.device)
         rewards = torch.Tensor(replay_buffer.rewards).to(self.device)
