@@ -190,7 +190,7 @@ class BasePpoAgent(nn.Module):
             enable_gae=True,
             gae_lambda=0.95, 
             clip_vloss=True,
-            epsilon=0.1,
+            clip_coef=0.1,
             max_grad_norm=0.5,
             value_coef=0.5, 
             entropy_coef=0.01, 
@@ -287,7 +287,7 @@ class BasePpoAgent(nn.Module):
                     # Calculate approx_kl http://joschu.net/blog/kl-approx.html
                     old_approx_kl = (-log_ratio).mean()
                     approx_kl = ((ratio - 1) - log_ratio).mean()
-                    clip_fractions += [((ratio - 1.0).abs() > epsilon).float().mean().item()]
+                    clip_fractions += [((ratio - 1.0).abs() > clip_coef).float().mean().item()]
 
                 mb_advantages = b_advantages[mb_inds]
                 if normalize_advantages:
@@ -295,7 +295,7 @@ class BasePpoAgent(nn.Module):
 
                 # Policy loss
                 pg_loss1 = -mb_advantages * ratio
-                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - epsilon, 1 + epsilon)
+                pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - clip_coef, 1 + clip_coef)
                 policy_loss = torch.max(pg_loss1, pg_loss2).mean()
 
                 # Value loss
@@ -304,8 +304,8 @@ class BasePpoAgent(nn.Module):
                     v_loss_unclipped = (new_value - b_returns[mb_inds]) ** 2
                     v_clipped = b_values[mb_inds] + torch.clamp(
                         new_value - b_values[mb_inds],
-                        -epsilon,
-                        epsilon,
+                        -clip_coef,
+                        clip_coef,
                     )
                     v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
                     v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
