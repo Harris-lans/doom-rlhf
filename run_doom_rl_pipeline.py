@@ -1,22 +1,21 @@
-from datetime import datetime
-from torch.utils.tensorboard import SummaryWriter
-from agents.doom_ppo_agent import DoomPpoAgent
-from utils.replay_buffer import ReplayBuffer
-from utils.env import make_vizdoom_env
-import gymnasium as gym
-import numpy as np
 import time
 import argparse
-import os
+from datetime import datetime
 from distutils.util import strtobool
+
+import numpy as np
+import gymnasium as gym
+from utils.os import clear_console
+from utils.env import make_vizdoom_env
+from utils.replay_buffer import ReplayBuffer
+from agents.doom_ppo_agent import DoomPpoAgent
+from torch.utils.tensorboard import SummaryWriter
+
 from tqdm import tqdm
 import logging
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 logger = logging.getLogger(__name__)
-
-def clear_console():
-    os.system('cls' if os.name == 'nt' else 'clear')
 
 def parse_args():
     # Environment and training specific arguments
@@ -30,7 +29,7 @@ def parse_args():
     parser.add_argument("--render-env", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="If toggled, one environment will be rendered")
     parser.add_argument("--enable-gpu", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
-        help="If toggled, gpu will be used for training")
+        help="If toggled, gpu will be used for training and using agent")
     parser.add_argument("--track-stats", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
         help="If toggled, the script will record training statistics using ")
 
@@ -71,11 +70,11 @@ def parse_args():
     return args
 
 if __name__ == "__main__":
+    # Parsing command line args
+    args = parse_args()
+
     logging.basicConfig(level=logging.INFO)
     with logging_redirect_tqdm():
-        # Parsing command line args
-        args = parse_args()
-
         # Storing start time for saving models and logs with timestamp
         start_datetime = datetime.now()
         start_datetime_timestamp_str = start_datetime.strftime('%Y_%m_%d_%H_%M_%S')
@@ -118,7 +117,6 @@ if __name__ == "__main__":
         clear_console()
 
         for update in tqdm(range(1, num_updates + 1), desc ="Training Doom PPO Agent", colour="#4287f5"):
-        # for update in range(1, num_updates + 1):
             if args.anneal_lr:
                 # Calculating learning rate annealing coefficient
                 learning_rate_anneal_coef = 1.0 - (update - 1.0) / num_updates
@@ -126,7 +124,6 @@ if __name__ == "__main__":
                 learning_rate_anneal_coef = None
 
             for step in tqdm(range(0, args.num_steps), desc ="Exploring the environment", colour="#42f551", leave=False):
-            # for step in range(0, args.num_steps):
                 global_step += args.num_envs
 
                 # Getting next action and it's value
