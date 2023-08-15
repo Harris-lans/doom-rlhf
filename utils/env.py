@@ -1,8 +1,6 @@
 import gymnasium as gym
 from envs.vizdoom_env import VizdoomEnv
-from utils.replay_buffer import ReplayBuffer
 from envs.wrappers.record_observations import RecordObservations
-from envs.wrappers.save_observations_in_state import SaveObservationsInState
 
 def make_vizdoom_env(level: str, render_mode=None, frame_stack_size=4):
     """Factory function to create a Doom environment with specified configurations.

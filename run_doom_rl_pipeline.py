@@ -21,7 +21,7 @@ def clear_console():
 def parse_args():
     # Environment and training specific arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env-cfg", type=str, default=os.path.basename(__file__).rstrip(".py"),
+    parser.add_argument("--env-cfg", type=str, default=None,
         help="The path to the ViZDoom config file")
     parser.add_argument("--learning-rate", type=float, default=0.0001,
         help="The learning rate of the optimizer")
