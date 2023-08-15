@@ -27,6 +27,8 @@ def parse_args():
         help="The learning rate of the optimizer")
     parser.add_argument("--total-timesteps", type=int, default=500000,
         help="Total timesteps to train for")
+    parser.add_argument("--render-env", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
+        help="If toggled, one environment will be rendered")
     parser.add_argument("--enable-gpu", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="If toggled, gpu will be used for training")
     parser.add_argument("--track-stats", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
@@ -86,7 +88,7 @@ if __name__ == "__main__":
         num_updates = args.total_timesteps // batch_size
 
         # Initializing environments
-        envs = gym.vector.SyncVectorEnv([ make_vizdoom_env(args.env_cfg) for i in range(args.num_envs)])
+        envs = gym.vector.SyncVectorEnv([ make_vizdoom_env(args.env_cfg, render_mode="human" if i == 0 and args.render_env else None) for i in range(args.num_envs)])
 
         # Setting up agent
         agent = DoomPpoAgent(envs.single_observation_space, 
