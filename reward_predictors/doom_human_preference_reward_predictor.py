@@ -4,19 +4,18 @@ import torch.nn as nn
 import torch
 
 class DoomHumanPreferenceRewardPredictor(BaseHumanPreferenceRewardPredictor):
-    """Custom PPO agent specifically designed for the Doom environment."""
-    
-    def __init__(self, observation_space: Space, hidden_size=64, learning_rate=0.00025, drop_out=0.5, use_gpu=True):
-        """
-        Initialize the DoomPpoAgent.
+    """
+    Custom human preferences reward predictor based on human preferences, designed for the Doom environment.
 
-        Parameters:
-            observation_space (gymnasium.Space): The observation space of the environment.
-            action_space (gymnasium.Space): The action space of the environment.
-            models_path (str): The path to the directory where models will be saved.
-            learning_rate (float): The learning rate for the optimizer.
-            use_gpu (bool): Whether to use GPU for training.
-        """
+    Parameters:
+        observation_space (gymnasium.Space): The observation space of the environment.
+        hidden_size (int): The size of the hidden layer.
+        learning_rate (float): The learning rate for the optimizer.
+        drop_out (float): Dropout probability for regularization.
+        use_gpu (bool): Whether to use GPU for training.
+    """
+
+    def __init__(self, observation_space: Space, hidden_size=64, learning_rate=0.00025, drop_out=0.5, use_gpu=True):
         observation_encoder = nn.Sequential(
             nn.Conv2d(observation_space.shape[0], 32, kernel_size=8, stride=4),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
@@ -53,6 +52,5 @@ class DoomHumanPreferenceRewardPredictor(BaseHumanPreferenceRewardPredictor):
             nn.LeakyReLU(negative_slope=0.01),
             nn.Linear(hidden_size, 1)
         )
-
 
         super().__init__(observation_encoder, reward_predictor, observation_space.shape, learning_rate, use_gpu)

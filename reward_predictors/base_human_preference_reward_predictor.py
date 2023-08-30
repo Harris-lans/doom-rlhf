@@ -90,14 +90,14 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         return rewards
 
     def forward(self, observations: np.ndarray):
-        """Forward pass of the reward predictor.
+        """
+        Forward pass of the reward predictor.
 
         Args:
-            observations (np.Array): Input observations.
-            actions (np.Array): Input actions.
+            observations (np.ndarray): Input observations.
 
         Returns:
-            torch.Tensor: Predicted rewards.
+            np.ndarray: Predicted rewards.
         """
         observations = torch.tensor(observations).to(self.device)
 
@@ -134,15 +134,14 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         return reward_predictions
 
     def train(self, segment_1: Segment, segment_2: Segment, preference: float, epochs: int = 1):
-        """Train the reward predictor model.
+        """
+        Train the reward predictor model.
 
         Args:
-            observations (torch.Tensor): Input observations.
-            actions (torch.Tensor): Input actions.
-            rewards (torch.Tensor): Corresponding rewards.
-            batch_size (int): Batch size.
-            mini_batch_size (int, optional): Mini-batch size. Defaults to 4.
-            num_training_epochs (int, optional): Number of training epochs. Defaults to 4.
+            segment_1 (Segment): The first segment.
+            segment_2 (Segment): The second segment.
+            preference (float): The preference value (0, 0.5, or 1).
+            epochs (int, optional): Number of training epochs. Defaults to 1.
 
         Returns:
             dict: Training statistics.

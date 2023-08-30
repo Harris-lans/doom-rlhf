@@ -88,7 +88,7 @@ class BasePpoAgent(nn.Module):
         # Moving torch module to chosen device
         self.to(self.device)
 
-    def save_models(self, path='./models'):
+    def save_models(self, path: str):
         """
         Save the agent's models.
 
@@ -104,7 +104,7 @@ class BasePpoAgent(nn.Module):
         torch.save(self.actor.state_dict(), f"{path}/actor.pth")
         torch.save(self.critic.state_dict(), f"{path}/critic.pth")
 
-    def load_models(self, path):
+    def load_models(self, path: str):
         """
         Load the agent's models.
 
@@ -118,54 +118,56 @@ class BasePpoAgent(nn.Module):
         assert os.path.isfile(f"{path}/critic.pth"), "The given path does not contain the critic model."
         
         # Loading models
-        print("Loading models...")
         network_state_dict = torch.load(f"{path}/base.pth", map_location=self.device)
         actor_state_dict = torch.load(f"{path}/actor.pth", map_location=self.device)
         critic_state_dict = torch.load(f"{path}/critic.pth", map_location=self.device)
-        print("Successfully loaded models!")
 
         # Updating networks with loaded models
-        print("Updating networks with weights from loaded models...")
         self.network.load_state_dict(network_state_dict)
         self.actor.load_state_dict(actor_state_dict)
         self.critic.load_state_dict(critic_state_dict)
-        print("Successfully updated networks!")
 
     def forward(self, observations):
         """
         Compute the optimal action and corresponding value for a given observation.
 
         Parameters:
-            observation (torch.Tensor): The input observation.
-            action (torch.Tensor): The action tensor (optional).
+            observations (numpy.ndarray): The input observation(s) representing the state(s) of the environment.
 
         Returns:
-            torch.Tensor: The sampled action.
-            torch.Tensor: The log probability of the action.
-            torch.Tensor: The entropy of the action distribution.
-            torch.Tensor: The value estimation.
+            numpy.ndarray: The selected action(s) sampled from the action distribution.
+            numpy.ndarray: The log probability of the selected action(s).
+            numpy.ndarray: The entropy of the action distribution.
+            numpy.ndarray: The estimated state value(s) for the input observation(s).
         """
+        # Convert observations to a tensor on the appropriate device
         observations = torch.tensor(observations).to(self.device)
 
+        # Calculate network outputs for policy (actor) and value function (critic)
+        # without calculating gradients
         with torch.no_grad():
             hidden = self.network(observations / 255.0)
             logits = self.actor(hidden)
             value = self.critic(hidden)
         
+        # Create a Categorical distribution over action logits
         probs = Categorical(logits=logits)
+
+        # Sample actions, calculate log probabilities, and compute entropy
         actions = probs.sample()
         log_probs = probs.log_prob(actions)
-        probs = probs.entropy()
+        entropies = probs.entropy()
 
-        return actions.cpu().numpy(), log_probs.cpu().numpy(), probs.cpu().numpy(), value.cpu().numpy()
+        # Convert tensors to NumPy arrays and return
+        return actions.cpu().numpy(), log_probs.cpu().numpy(), entropies.cpu().numpy(), value.cpu().numpy()
     
     def _training_forward(self, observations: torch.Tensor, actions: torch.Tensor):
         """
         Compute the optimal action and corresponding value for a given observation.
 
         Parameters:
-            observation (torch.Tensor): The input observation.
-            action (torch.Tensor): The action tensor (optional).
+            observations (torch.Tensor): The input observation.
+            actions (torch.Tensor): The action tensor (optional).
 
         Returns:
             torch.Tensor: The sampled action.
@@ -179,9 +181,9 @@ class BasePpoAgent(nn.Module):
 
         probs = Categorical(logits=logits)
         log_probs = probs.log_prob(actions)
-        probs = probs.entropy()
+        entropies = probs.entropy()
 
-        return actions, log_probs, probs, value
+        return actions, log_probs, entropies, value
         
     def train(
             self,
@@ -203,19 +205,12 @@ class BasePpoAgent(nn.Module):
         Train the PPO agent.
 
         Parameters:
-            observations (ndarray): The batch of observations.
-            actions (ndarray): The batch of actions.
-            log_probs (ndarray): The batch of log probabilities.
-            rewards (ndarray): The batch of rewards.
-            values (ndarray): The batch of value estimations.
-            dones (ndarray): The batch of done signals.
-            num_steps (int): The number of steps taken in the environment.
-            batch_size (int): The size of the batch.
+            replay_buffer (ReplayBuffer): The replay buffer containing the training data.
             gamma (float): The discount factor.
             enable_gae (bool): Whether to enable Generalized Advantage Estimation (GAE).
             gae_lambda (float): The lambda value for GAE.
             clip_vloss (bool): Whether to clip the value loss.
-            epsilon (float): The clipping parameter.
+            clip_coef (float): The clipping parameter.
             max_grad_norm (float): The maximum norm for gradient clipping.
             value_coef (float): The coefficient for the value loss.
             entropy_coef (float): The coefficient for the entropy loss.
@@ -313,6 +308,7 @@ class BasePpoAgent(nn.Module):
                 else:
                     value_loss = 0.5 * ((new_value - b_returns[mb_inds]) ** 2).mean()
 
+                # Backpropagation and optimization step
                 entropy_loss = entropy.mean()
                 loss = policy_loss - entropy_coef * entropy_loss + value_loss * value_coef
 
@@ -321,10 +317,12 @@ class BasePpoAgent(nn.Module):
                 nn.utils.clip_grad_norm_(self.parameters(), max_grad_norm)
                 self.optimizer.step()
 
+            # Early stopping based on KL divergence
             if target_kl is not None:
                 if approx_kl > target_kl:
                     break
-
+        
+        # Compute training statistics
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_variance = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
