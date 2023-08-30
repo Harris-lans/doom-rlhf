@@ -20,7 +20,7 @@ class Segment:
         self.log_probs = np.zeros((num_steps,), dtype=np.float32)
         self.rewards = np.zeros((num_steps,), dtype=np.float32)
         self.values = np.zeros((num_steps,), dtype=np.float32)
-        self.dones = np.zeros((num_steps,), dtype=np.uint8)
+        self.terminations = np.zeros((num_steps,), dtype=np.uint8)
         self.num_steps = num_steps
 
         self.raw_observation_space = raw_observation_space
@@ -37,9 +37,9 @@ class Segment:
 
         Returns:
             tuple
-                A tuple containing observation, action, log probability, reward, value, and done status at the specified index.
+                A tuple containing observation, action, log probability, reward, value, and termination status at the specified index.
         """
-        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
+        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.terminations[index]
 
     def __getitem__(self, index):
         """
@@ -51,9 +51,9 @@ class Segment:
 
         Returns:
             tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and done flags at the specified index.
+                A tuple containing observations, actions, log probabilities, rewards, values, and termination status at the specified index.
         """
-        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
+        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.terminations[index]
 
     def __setitem__(self, index, value):
         """
@@ -63,7 +63,7 @@ class Segment:
             index: int
                 The index where the data will be set.
             value: tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and done flags to be set at the specified index.
+                A tuple containing observations, actions, log probabilities, rewards, values, and termination status to be set at the specified index.
         """
         self.raw_observations[index] = value[0]
         self.processed_observations[index] = value[1]
@@ -71,7 +71,7 @@ class Segment:
         self.log_probs[index] = value[3]
         self.rewards[index] = value[4]
         self.values[index] = value[5]
-        self.dones[index] = value[6]
+        self.terminations[index] = value[6]
 
     def __len__(self):
         """
@@ -100,13 +100,13 @@ class Segment:
 
         Returns:
             tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and done flags.
+                A tuple containing observations, actions, log probabilities, rewards, values, and termination status.
         Raises:
             StopIteration
                 When the iteration is complete.
         """
         if self.index < self.num_steps:
-            result = (self.raw_observations[self.index], self.processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.dones[self.index])
+            result = (self.raw_observations[self.index], self.processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.terminations[self.index])
             self.index += 1
             return result
         else:

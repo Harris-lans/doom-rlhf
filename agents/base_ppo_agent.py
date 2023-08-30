@@ -234,7 +234,7 @@ class BasePpoAgent(nn.Module):
         log_probs = torch.Tensor(replay_buffer.log_probs).to(self.device)
         rewards = torch.Tensor(replay_buffer.rewards).to(self.device)
         values = torch.Tensor(replay_buffer.values).to(self.device)
-        dones = torch.Tensor(replay_buffer.dones).to(self.device)
+        terminations = torch.Tensor(replay_buffer.terminations).to(self.device)
 
         # Get the number of steps and the number of environments
         num_steps, num_envs = replay_buffer.num_steps, replay_buffer.num_envs
@@ -243,7 +243,7 @@ class BasePpoAgent(nn.Module):
             advantages = torch.zeros_like(rewards)
             last_gae_lambda = 0
             for t in reversed(range(num_steps - 1)):
-                next_non_terminal = 1.0 - dones[t + 1]
+                next_non_terminal = 1.0 - terminations[t + 1]
                 next_values = values[t + 1]
                 delta = rewards[t] + gamma * next_values * next_non_terminal - values[t]
                 advantages[t] = last_gae_lambda = delta + gamma * gae_lambda * next_non_terminal * last_gae_lambda
@@ -251,7 +251,7 @@ class BasePpoAgent(nn.Module):
         else:
             returns = torch.zeros_like(rewards)
             for t in reversed(range(num_steps - 1)):
-                next_non_terminal = 1.0 - dones[t + 1]
+                next_non_terminal = 1.0 - terminations[t + 1]
                 next_return = returns[t + 1]
                 returns[t] = rewards[t] + gamma * next_non_terminal * next_return
             advantages = returns - values

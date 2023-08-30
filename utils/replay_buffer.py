@@ -23,7 +23,7 @@ class ReplayBuffer:
         self.log_probs = np.zeros((num_steps, num_envs), dtype=np.float32)
         self.rewards = np.zeros((num_steps, num_envs), dtype=np.float32)
         self.values = np.zeros((num_steps, num_envs), dtype=np.float32)
-        self.dones = np.zeros((num_steps, num_envs), dtype=np.int8)
+        self.terminations = np.zeros((num_steps, num_envs), dtype=np.int8)
         
         self.num_steps = num_steps
         self.num_envs = num_envs
@@ -41,9 +41,9 @@ class ReplayBuffer:
 
         Returns:
             tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and done flags at the specified index.
+                A tuple containing observations, actions, log probabilities, rewards, values, and termination status at the specified index.
         """
-        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.dones[index]
+        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.terminations[index]
 
     def __setitem__(self, index, value):
         """
@@ -53,7 +53,7 @@ class ReplayBuffer:
             index: int
                 The index where the data will be set.
             value: tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and done flags to be set at the specified index.
+                A tuple containing observations, actions, log probabilities, rewards, values, and termination status to be set at the specified index.
         """
         self.raw_observations[index] = value[0]
         self.processed_observations[index] = value[1]
@@ -61,7 +61,7 @@ class ReplayBuffer:
         self.log_probs[index] = value[3]
         self.rewards[index] = value[4]
         self.values[index] = value[5]
-        self.dones[index] = value[6]
+        self.terminations[index] = value[6]
 
     def __len__(self):
         """
@@ -90,46 +90,17 @@ class ReplayBuffer:
 
         Returns:
             tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and done flags.
+                A tuple containing observations, actions, log probabilities, rewards, values, and termination status.
         Raises:
             StopIteration
                 When the iteration is complete.
         """
         if self.index < self.num_steps:
-            result = (self.raw_observations[self.index], self.processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.dones[self.index])
+            result = (self.raw_observations[self.index], self.processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.terminations[self.index])
             self.index += 1
             return result
         else:
             raise StopIteration
-        
-    def get_episodic_segments(self, max_episodic_length: int):
-        segments = []
-
-        # Looping through all the steps, one environment at a time
-        for env in range(self.num_envs):
-            current_segment_start_step = 0
-            for step in range(self.num_steps):
-                num_steps_in_segment = step - current_segment_start_step
-                if self.dones[step][env] == 1 or step == self.num_steps - 1 or num_steps_in_segment >= max_episodic_length:
-                    segment = Segment(num_steps_in_segment, 
-                                      self.raw_observation_space, 
-                                      self.processed_observation_space, 
-                                      self.action_space)
-                    segment_step = 0
-                    for buffer_step in range(current_segment_start_step, step):
-                        segment[segment_step] = (self.raw_observations[buffer_step][env], 
-                                                 self.processed_observations[buffer_step][env],
-                                                 self.actions[buffer_step][env],
-                                                 self.log_probs[buffer_step][env],
-                                                 self.rewards[buffer_step][env],
-                                                 self.values[buffer_step][env],
-                                                 self.dones[buffer_step][env])
-                        segment_step += 1
-                    segments.append(segment)
-
-                    current_segment_start_step = step
-
-        return segments
     
     def get_segments(self, segment_length: int):
         segments = []
@@ -148,12 +119,12 @@ class ReplayBuffer:
                 segment_step = 0
                 for buffer_step in range(current_segment_start_step, current_segment_start_step + segment_length):
                     segment[segment_step] = (self.raw_observations[buffer_step][env], 
-                                                self.processed_observations[buffer_step][env],
-                                                self.actions[buffer_step][env],
-                                                self.log_probs[buffer_step][env],
-                                                self.rewards[buffer_step][env],
-                                                self.values[buffer_step][env],
-                                                self.dones[buffer_step][env])
+                                             self.processed_observations[buffer_step][env],
+                                             self.actions[buffer_step][env],
+                                             self.log_probs[buffer_step][env],
+                                             self.rewards[buffer_step][env],
+                                             self.values[buffer_step][env],
+                                             self.terminations[buffer_step][env])
                     segment_step += 1
                 segments.append(segment)
 

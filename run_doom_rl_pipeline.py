@@ -143,7 +143,7 @@ if __name__ == "__main__":
                     terminations
                 )
 
-                # Saving new observation and done status for next step
+                # Saving new observation and termination status for next step
                 observations = observations_
                 terminations =  terminations_
                 
