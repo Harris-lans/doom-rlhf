@@ -1,13 +1,11 @@
 name: doom-rlhf
 channels:
-  - apple
-  - conda-forge
+  - pytorch
 dependencies:
   - python=3.9.7
   - pip
   - ipykernel
-  - pytorch
-  - ffmpeg
+  - pytorch 
 
   ## PyPI packages
   - pip:
@@ -19,7 +17,6 @@ dependencies:
     - opencv_python==4.7.0.72
     - matplotlib==3.7.1
     - stable-baselines3[extra]
-    - moviepy
     - tensorboard
     - torch-tb-profiler
     - ipywidgets
