@@ -198,6 +198,7 @@ _vizdoom.ini
 ### Saved models and logs
 models
 logs
+stats
 runs
 videos
 temp

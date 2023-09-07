@@ -24,10 +24,12 @@ def parse_args():
         help="The path to the ViZDoom config file")
     parser.add_argument("--learning-rate", type=float, default=0.0001,
         help="The learning rate of the optimizer")
-    parser.add_argument("--total-timesteps", type=int, default=500000,
+    parser.add_argument("--total-timesteps", type=int, default=300000,
         help="Total timesteps to train for")
     parser.add_argument("--render-env", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="If toggled, one environment will be rendered")
+    parser.add_argument("--model-save-threshold", type=int, default=7000,
+        help="Number of steps before model saving is enabled")
     parser.add_argument("--enable-gpu", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="If toggled, gpu will be used for training and using agent")
     parser.add_argument("--track-stats", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
@@ -103,7 +105,7 @@ if __name__ == "__main__":
                                     envs.single_action_space)
 
         if args.track_stats:
-            tensorboard_logs_directory = f"./stats/ppo_agent/doom_basic_level/training_{start_datetime_timestamp_str}"
+            tensorboard_logs_directory = f"./stats/doom_basic_level/rl_training_{start_datetime_timestamp_str}"
 
             # Setting up debugging for Tensorboard
             tensorboard_writer = SummaryWriter(tensorboard_logs_directory)
@@ -157,15 +159,18 @@ if __name__ == "__main__":
 
                             # Writing environment stats to TensorBoard
                             if args.track_stats:
-                                tensorboard_writer.add_scalar("charts/episodic_return", env_info["episode"]["r"], global_step)
-                                tensorboard_writer.add_scalar("charts/episodic_length", env_info["episode"]["l"], global_step)
+                                tensorboard_writer.add_scalar("ppo_agent/charts/episodic_return", env_info["episode"]["r"], global_step)
+                                tensorboard_writer.add_scalar("ppo_agent/charts/episodic_length", env_info["episode"]["l"], global_step)
 
                             break
 
-            # Checking if the current mean is higher than previous highest mean and saving the model
+            # Calculating current mean episodic return
             current_mean_episodic_return = np.mean(returns)
             logger.info(f"Current Mean Episodic Return = {current_mean_episodic_return}")
-            if current_mean_episodic_return > best_average_return:
+
+            # Checking if the current mean is higher than previous highest mean 
+            # and if the number of steps taken exceeds the model save threshold, and then saving the model
+            if current_mean_episodic_return > best_average_return and global_step > args.model_save_threshold:
                 # Saving the model
                 model_save_path = f"./models/rl_pipeline/training_run_{start_datetime_timestamp_str}/doom_ppo_agent/checkpoint_step_{global_step}"
                 logger.info(f"Saving models to `{model_save_path}`...")
@@ -196,15 +201,15 @@ if __name__ == "__main__":
 
             # Writing training stats to TensorBoard
             if args.track_stats:
-                tensorboard_writer.add_scalar("charts/learning_rate", training_stats.learning_rate, global_step)
-                tensorboard_writer.add_scalar("losses/value_loss", training_stats.value_loss, global_step)
-                tensorboard_writer.add_scalar("losses/policy_loss", training_stats.policy_loss, global_step)
-                tensorboard_writer.add_scalar("losses/entropy_loss", training_stats.entropy_loss, global_step)
-                tensorboard_writer.add_scalar("charts/old_approx_kl", training_stats.old_approx_kl, global_step)
-                tensorboard_writer.add_scalar("charts/approx_kl", training_stats.approx_kl, global_step)
-                tensorboard_writer.add_scalar("charts/clip_fraction", training_stats.clip_fraction, global_step)
-                tensorboard_writer.add_scalar("charts/explained_variance", training_stats.explained_variance, global_step)
-                tensorboard_writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+                tensorboard_writer.add_scalar("ppo_agent/charts/learning_rate", training_stats.learning_rate, global_step)
+                tensorboard_writer.add_scalar("ppo_agent/losses/value_loss", training_stats.value_loss, global_step)
+                tensorboard_writer.add_scalar("ppo_agent/losses/policy_loss", training_stats.policy_loss, global_step)
+                tensorboard_writer.add_scalar("ppo_agent/losses/entropy_loss", training_stats.entropy_loss, global_step)
+                tensorboard_writer.add_scalar("ppo_agent/charts/old_approx_kl", training_stats.old_approx_kl, global_step)
+                tensorboard_writer.add_scalar("ppo_agent/charts/approx_kl", training_stats.approx_kl, global_step)
+                tensorboard_writer.add_scalar("ppo_agent/charts/clip_fraction", training_stats.clip_fraction, global_step)
+                tensorboard_writer.add_scalar("ppo_agent/charts/explained_variance", training_stats.explained_variance, global_step)
+                tensorboard_writer.add_scalar("ppo_agent/charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
         # Closing environments
         envs.close()

@@ -3,29 +3,29 @@ from utils.segment import Segment
 import gymnasium as gym
 
 class ReplayBuffer:
-    def __init__(self, num_steps: int, num_envs: int, raw_observation_space: gym.spaces.Box, processed_observation_space: gym.spaces.Box, action_space: gym.spaces.Discrete):
+    def __init__(self, num_steps_per_env: int, num_envs: int, raw_observation_space: gym.spaces.Box, processed_observation_space: gym.spaces.Box, action_space: gym.spaces.Discrete):
         """
         Initialize the ReplayBuffer.
 
         Parameters:
-            num_steps: int
-                The number of steps in each environment trajectory.
+            num_steps_per_env: int
+                The number of steps in each environment.
             num_envs: int
-                The number of parallel environments (usually the batch size).
+                The number of parallel environments.
             processed_observation_space: gym.Space
                 The observation space of the environment.
             action_space: gym.Space
                 The action space of the environment.
         """
-        self.raw_observations = np.zeros((num_steps, num_envs) + raw_observation_space.shape, dtype=raw_observation_space.dtype)
-        self.processed_observations = np.zeros((num_steps, num_envs) + processed_observation_space.shape, dtype=processed_observation_space.dtype)
-        self.actions = np.zeros((num_steps, num_envs) + action_space.shape, dtype=action_space.dtype)
-        self.log_probs = np.zeros((num_steps, num_envs), dtype=np.float32)
-        self.rewards = np.zeros((num_steps, num_envs), dtype=np.float32)
-        self.values = np.zeros((num_steps, num_envs), dtype=np.float32)
-        self.terminations = np.zeros((num_steps, num_envs), dtype=np.int8)
+        self.raw_observations = np.zeros((num_steps_per_env, num_envs) + raw_observation_space.shape, dtype=raw_observation_space.dtype)
+        self.processed_observations = np.zeros((num_steps_per_env, num_envs) + processed_observation_space.shape, dtype=processed_observation_space.dtype)
+        self.actions = np.zeros((num_steps_per_env, num_envs) + action_space.shape, dtype=action_space.dtype)
+        self.log_probs = np.zeros((num_steps_per_env, num_envs), dtype=np.float32)
+        self.rewards = np.zeros((num_steps_per_env, num_envs), dtype=np.float32)
+        self.values = np.zeros((num_steps_per_env, num_envs), dtype=np.float32)
+        self.terminations = np.zeros((num_steps_per_env, num_envs), dtype=np.int8)
         
-        self.num_steps = num_steps
+        self.num_steps_per_env = num_steps_per_env
         self.num_envs = num_envs
         self.raw_observation_space = raw_observation_space
         self.processed_observation_space = processed_observation_space
@@ -71,7 +71,7 @@ class ReplayBuffer:
             int
                 The number of steps in the ReplayBuffer.
         """
-        return self.num_steps
+        return self.num_steps_per_env
 
     def __iter__(self):
         """
@@ -95,7 +95,7 @@ class ReplayBuffer:
             StopIteration
                 When the iteration is complete.
         """
-        if self.index < self.num_steps:
+        if self.index < self.num_steps_per_env:
             result = (self.raw_observations[self.index], self.processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.terminations[self.index])
             self.index += 1
             return result
@@ -105,12 +105,12 @@ class ReplayBuffer:
     def get_segments(self, segment_length: int):
         segments = []
         
-        assert self.num_steps % segment_length == 0, "The segment length must be a divisible of the number of steps in the segment"
+        assert self.num_steps_per_env % segment_length == 0, "The segment length must be a divisible of the number of steps in the segment"
 
         # Looping through all the steps, one environment at a time
         for env in range(self.num_envs):
             # Creating segments of the provided size
-            for step in range(0, self.num_steps, segment_length):
+            for step in range(0, self.num_steps_per_env, segment_length):
                 current_segment_start_step = step
                 segment = Segment(segment_length, 
                                     self.raw_observation_space, 

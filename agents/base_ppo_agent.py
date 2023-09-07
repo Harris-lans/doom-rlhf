@@ -237,7 +237,7 @@ class BasePpoAgent(nn.Module):
         terminations = torch.Tensor(replay_buffer.terminations).to(self.device)
 
         # Get the number of steps and the number of environments
-        num_steps, num_envs = replay_buffer.num_steps, replay_buffer.num_envs
+        num_steps, num_envs = replay_buffer.num_steps_per_env, replay_buffer.num_envs
 
         if enable_gae:
             advantages = torch.zeros_like(rewards)

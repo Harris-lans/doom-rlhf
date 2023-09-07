@@ -15,7 +15,7 @@ class DoomHumanPreferenceRewardPredictor(BaseHumanPreferenceRewardPredictor):
         use_gpu (bool): Whether to use GPU for training.
     """
 
-    def __init__(self, observation_space: Space, hidden_size=64, learning_rate=0.00025, drop_out=0.5, use_gpu=True):
+    def __init__(self, observation_space: Space, hidden_layer_size=64, learning_rate=0.00025, drop_out=0.5, use_gpu=True):
         observation_encoder = nn.Sequential(
             nn.Conv2d(observation_space.shape[0], 32, kernel_size=8, stride=4),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
@@ -46,11 +46,11 @@ class DoomHumanPreferenceRewardPredictor(BaseHumanPreferenceRewardPredictor):
 
         reward_predictor = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(conv_output_size, hidden_size),
+            nn.Linear(conv_output_size, hidden_layer_size),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(hidden_layer_size, hidden_layer_size),
             nn.LeakyReLU(negative_slope=0.01),
-            nn.Linear(hidden_size, 1)
+            nn.Linear(hidden_layer_size, 1)
         )
 
         super().__init__(observation_encoder, reward_predictor, observation_space.shape, learning_rate, use_gpu)
