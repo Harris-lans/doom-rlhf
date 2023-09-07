@@ -19,7 +19,6 @@ dependencies:
     - opencv_python==4.7.0.72
     - matplotlib==3.7.1
     - stable-baselines3[extra]
-    - moviepy
     - tensorboard
     - torch-tb-profiler
     - ipywidgets
