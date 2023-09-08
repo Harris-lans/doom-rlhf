@@ -166,6 +166,7 @@ if __name__ == "__main__":
 
             # Calculating current mean episodic return
             current_mean_episodic_return = np.mean(returns)
+            returns.clear()
             logger.info(f"Current Mean Episodic Return = {current_mean_episodic_return}")
 
             # Checking if the current mean is higher than previous highest mean 
@@ -179,7 +180,6 @@ if __name__ == "__main__":
 
                 # Saving new best average return and clearing returns arrays
                 best_average_return = current_mean_episodic_return
-                returns.clear()
             
             # Training the agent
             training_stats = agent.train(
