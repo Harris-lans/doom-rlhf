@@ -191,14 +191,14 @@ class BasePpoAgent(nn.Module):
             gamma= 0.99, 
             enable_gae=True,
             gae_lambda=0.95, 
-            clip_vloss=True,
+            clip_value_loss=True,
             clip_coef=0.1,
-            max_grad_norm=0.5,
+            max_norm_grad=0.5,
             value_coef=0.5, 
             entropy_coef=0.01, 
-            learning_rate_anneal_coef=None,
+            lr_anneal_coef=None,
             target_kl=None,
-            normalize_advantages=True,
+            norm_adv=True,
             mini_batch_size=4,
             num_training_epochs=4):
         """
@@ -209,14 +209,14 @@ class BasePpoAgent(nn.Module):
             gamma (float): The discount factor.
             enable_gae (bool): Whether to enable Generalized Advantage Estimation (GAE).
             gae_lambda (float): The lambda value for GAE.
-            clip_vloss (bool): Whether to clip the value loss.
+            clip_value_loss (bool): Whether to clip the value loss.
             clip_coef (float): The clipping parameter.
-            max_grad_norm (float): The maximum norm for gradient clipping.
+            max_norm_grad (float): The maximum norm for gradient clipping.
             value_coef (float): The coefficient for the value loss.
             entropy_coef (float): The coefficient for the entropy loss.
-            learning_rate_anneal_coef (float): The coefficient for learning rate annealing.
+            lr_anneal_coef (float): The coefficient for learning rate annealing.
             target_kl (float): The target KL divergence.
-            normalize_advantages (bool): Whether to normalize advantages.
+            norm_adv (bool): Whether to normalize advantages.
             mini_batch_size (int): The size of mini-batches.
             num_training_epochs (int): The number of training epochs.
 
@@ -224,8 +224,8 @@ class BasePpoAgent(nn.Module):
             TrainingStats: The training statistics.
         """
         # Annealing the rate if instructed to do so.
-        if learning_rate_anneal_coef is not None:
-            new_learning_rate = learning_rate_anneal_coef * self.learning_rate
+        if lr_anneal_coef is not None:
+            new_learning_rate = lr_anneal_coef * self.learning_rate
             self.optimizer.param_groups[0]["lr"] = new_learning_rate
 
         # Convert replay buffer data into tensors
@@ -285,7 +285,7 @@ class BasePpoAgent(nn.Module):
                     clip_fractions += [((ratio - 1.0).abs() > clip_coef).float().mean().item()]
 
                 mb_advantages = b_advantages[mb_inds]
-                if normalize_advantages:
+                if norm_adv:
                     mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
 
                 # Policy loss
@@ -295,7 +295,7 @@ class BasePpoAgent(nn.Module):
 
                 # Value loss
                 new_value = new_value.view(-1)
-                if clip_vloss:
+                if clip_value_loss:
                     v_loss_unclipped = (new_value - b_returns[mb_inds]) ** 2
                     v_clipped = b_values[mb_inds] + torch.clamp(
                         new_value - b_values[mb_inds],
@@ -314,7 +314,7 @@ class BasePpoAgent(nn.Module):
 
                 self.optimizer.zero_grad()
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.parameters(), max_grad_norm)
+                nn.utils.clip_grad_norm_(self.parameters(), max_norm_grad)
                 self.optimizer.step()
 
             # Early stopping based on KL divergence

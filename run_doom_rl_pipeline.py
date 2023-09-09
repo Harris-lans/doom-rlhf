@@ -24,8 +24,8 @@ def parse_args():
         help="The path to the ViZDoom config file")
     parser.add_argument("--learning-rate", type=float, default=0.0001,
         help="The learning rate of the optimizer")
-    parser.add_argument("--total-timesteps", type=int, default=300000,
-        help="Total timesteps to train for")
+    parser.add_argument("--total-steps", type=int, default=300000,
+        help="Total steps to train the agent for")
     parser.add_argument("--render-env", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="If toggled, one environment will be rendered")
     parser.add_argument("--model-save-threshold", type=int, default=7000,
@@ -48,7 +48,7 @@ def parse_args():
         help="The discount factor gamma")
     parser.add_argument("--gae-lambda", type=float, default=0.95,
         help="The lambda for the general advantage estimation")
-    parser.add_argument("--num-minibatches", type=int, default=32,
+    parser.add_argument("--num-mini-batches", type=int, default=32,
         help="The number of mini-batches")
     parser.add_argument("--training-epochs", type=int, default=10,
         help="The number of training epochs when training the agent")
@@ -56,14 +56,14 @@ def parse_args():
         help="Toggles advantages normalization")
     parser.add_argument("--clip-coef", type=float, default=0.1,
         help="The surrogate clipping coefficient")
-    parser.add_argument("--clip-vloss", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
+    parser.add_argument("--clip-value-loss", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="Toggles whether or not to use a clipped loss for the value function, as per the paper.")
     parser.add_argument("--entropy-coef", type=float, default=0.01,
         help="Coefficient of the entropy")
     parser.add_argument("--value-coef", type=float, default=0.5,
         help="Coefficient of the value function")
-    parser.add_argument("--max-grad-norm", type=float, default=0.5,
-        help="The maximum norm for the gradient clipping")
+    parser.add_argument("--max-norm-grad", type=float, default=0.5,
+        help="The maximum normalized gradient for clipping")
     parser.add_argument("--target-kl", type=float, default=None,
         help="The target KL divergence threshold")
     
@@ -85,8 +85,8 @@ if __name__ == "__main__":
         global_step = 0
         start_time = start_datetime.timestamp()
         batch_size = int(args.num_envs * args.num_steps)
-        minibatch_size = batch_size // args.num_minibatches
-        num_updates = args.total_timesteps // batch_size
+        minibatch_size = batch_size // args.num_mini_batches
+        num_updates = args.total_steps // batch_size
 
         # Initializing environments
         envs = gym.vector.SyncVectorEnv([ make_vizdoom_env(args.env_cfg, render_mode="human" if i == 0 and args.render_env else None) for i in range(args.num_envs)])
@@ -121,9 +121,9 @@ if __name__ == "__main__":
         for update in tqdm(range(1, num_updates + 1), desc ="Training Doom PPO Agent", colour="#4287f5"):
             if args.anneal_lr:
                 # Calculating learning rate annealing coefficient
-                learning_rate_anneal_coef = 1.0 - (update - 1.0) / num_updates
+                lr_anneal_coef = 1.0 - (update - 1.0) / num_updates
             else:
-                learning_rate_anneal_coef = None
+                lr_anneal_coef = None
 
             for step in tqdm(range(0, args.num_steps), desc ="Exploring the environment", colour="#42f551", leave=False):
                 global_step += args.num_envs
@@ -187,14 +187,14 @@ if __name__ == "__main__":
                 gamma=args.gamma,
                 enable_gae=args.enable_gae,
                 gae_lambda=args.gae_lambda,
-                clip_vloss=args.clip_vloss,
+                clip_value_loss=args.clip_value_loss,
                 clip_coef=args.clip_coef,
-                max_grad_norm=args.max_grad_norm,
+                max_norm_grad=args.max_norm_grad,
                 value_coef=args.value_coef,
                 entropy_coef=args.entropy_coef,
-                learning_rate_anneal_coef=learning_rate_anneal_coef,
+                lr_anneal_coef=lr_anneal_coef,
                 target_kl=args.target_kl,
-                normalize_advantages=args.norm_adv,
+                norm_adv=args.norm_adv,
                 mini_batch_size=minibatch_size,
                 num_training_epochs=args.training_epochs
             )
