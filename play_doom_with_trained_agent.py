@@ -23,7 +23,7 @@ def parse_args():
     # Agent arguments
     parser.add_argument("--agent-model", type=str, default=None,
         help="The path to the trained model for the agent")
-    parser.add_argument("--enable-gpu", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
+    parser.add_argument("--enable-gpu", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
         help="If toggled, gpu will be used by agent")
     # Play arguments
     parser.add_argument("--episodes", type=int, default=50,
