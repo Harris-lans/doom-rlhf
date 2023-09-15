@@ -7,9 +7,9 @@ class DoomHumanPreferenceRewardPredictor(BaseHumanPreferenceRewardPredictor):
     """
     Custom human preferences reward predictor based on human preferences, designed for the Doom environment.
 
-    Parameters:
+    Args:
         observation_space (gymnasium.Space): The observation space of the environment.
-        hidden_size (int): The size of the hidden layer.
+        hidden_layer_size (int): The size of the hidden layer.
         learning_rate (float): The learning rate for the optimizer.
         drop_out (float): Dropout probability for regularization.
         use_gpu (bool): Whether to use GPU for training.

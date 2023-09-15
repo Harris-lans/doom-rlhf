@@ -4,7 +4,9 @@ from gymnasium.spaces import Discrete
 import torch.nn as nn
 
 class DoomPpoAgent(BasePpoAgent):
-    """Custom PPO agent specifically designed for the Doom environment."""
+    """
+    Custom PPO agent specifically designed for the Doom environment.
+    """
     
     def __init__(self, observation_space, action_space, learning_rate=0.00025, use_gpu=True):
         """
@@ -13,7 +15,6 @@ class DoomPpoAgent(BasePpoAgent):
         Parameters:
             observation_space (gymnasium.Space): The observation space of the environment.
             action_space (gymnasium.Space): The action space of the environment.
-            models_path (str): The path to the directory where models will be saved.
             learning_rate (float): The learning rate for the optimizer.
             use_gpu (bool): Whether to use GPU for training.
         """

@@ -6,10 +6,9 @@ def make_vizdoom_env(level: str, render_mode=None, frame_stack_size=4):
     """Factory function to create a Doom environment with specified configurations.
 
     Args:
-        level_config_path (str): Path to the Doom level configuration file.
+        level (str): Path to the Doom level configuration file.
+        render_mode (str, optional): Rendering mode for the environment. Defaults to None.
         frame_stack_size (int, optional): Number of frames to stack as input. Defaults to 4.
-        record_episodes (bool, optional): Whether to record episodes. Defaults to False.
-        render (bool, optional): Whether to render the environment. Defaults to True.
 
     Returns:
         function: A thunk that creates the Doom environment.

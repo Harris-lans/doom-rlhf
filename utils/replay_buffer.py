@@ -8,14 +8,11 @@ class ReplayBuffer:
         Initialize the ReplayBuffer.
 
         Parameters:
-            num_steps_per_env: int
-                The number of steps in each environment.
-            num_envs: int
-                The number of parallel environments.
-            processed_observation_space: gym.Space
-                The observation space of the environment.
-            action_space: gym.Space
-                The action space of the environment.
+            num_steps_per_env (int): The number of steps in each environment.
+            num_envs (int): The number of parallel environments.
+            raw_observation_space (gym.spaces.Box): The observation space of the environment.
+            processed_observation_space (gym.spaces.Box): The processed observation space of the environment.
+            action_space (gym.spaces.Discrete): The action space of the environment.
         """
         self.raw_observations = np.zeros((num_steps_per_env, num_envs) + raw_observation_space.shape, dtype=raw_observation_space.dtype)
         self.processed_observations = np.zeros((num_steps_per_env, num_envs) + processed_observation_space.shape, dtype=processed_observation_space.dtype)
@@ -36,12 +33,10 @@ class ReplayBuffer:
         Get the data at the specified index in the ReplayBuffer.
 
         Parameters:
-            index: int
-                The index of the data to retrieve.
+            index (int): The index of the data to retrieve.
 
         Returns:
-            tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and termination status at the specified index.
+            tuple: A tuple containing observations, actions, log probabilities, rewards, values, and termination status at the specified index.
         """
         return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.terminations[index]
 
@@ -50,10 +45,8 @@ class ReplayBuffer:
         Set the data at the specified index in the ReplayBuffer.
 
         Parameters:
-            index: int
-                The index where the data will be set.
-            value: tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and termination status to be set at the specified index.
+            index (int): The index where the data will be set.
+            value (tuple): A tuple containing observations, actions, log probabilities, rewards, values, and termination status to be set at the specified index.
         """
         self.raw_observations[index] = value[0]
         self.processed_observations[index] = value[1]
@@ -68,8 +61,7 @@ class ReplayBuffer:
         Get the number of steps in the ReplayBuffer.
 
         Returns:
-            int
-                The number of steps in the ReplayBuffer.
+            int: The number of steps in the ReplayBuffer.
         """
         return self.num_steps_per_env
 
@@ -78,8 +70,7 @@ class ReplayBuffer:
         Initialize the iterator for the ReplayBuffer.
 
         Returns:
-            ReplayBuffer
-                The iterator object.
+            ReplayBuffer: The iterator object.
         """
         self.index = 0
         return self
@@ -89,11 +80,10 @@ class ReplayBuffer:
         Get the next data in the ReplayBuffer during iteration.
 
         Returns:
-            tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and termination status.
+            tuple: A tuple containing observations, actions, log probabilities, rewards, values, and termination status.
+
         Raises:
-            StopIteration
-                When the iteration is complete.
+            StopIteration: When the iteration is complete.
         """
         if self.index < self.num_steps_per_env:
             result = (self.raw_observations[self.index], self.processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.terminations[self.index])
@@ -103,6 +93,17 @@ class ReplayBuffer:
             raise StopIteration
     
     def get_segments(self, segment_length: int):
+        """
+        Get segments from the ReplayBuffer.
+
+        This method divides the replay buffer into segments of a specified length.
+
+        Parameters:
+            segment_length (int): The length of each segment.
+
+        Returns:
+            list: A list of segments, each containing observations, actions, log probabilities, rewards, values, and termination status.
+        """
         segments = []
         
         assert self.num_steps_per_env % segment_length == 0, "The segment length must be a divisible of the number of steps in the segment"

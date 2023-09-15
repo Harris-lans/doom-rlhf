@@ -1,7 +1,6 @@
 import numpy as np
 import torch.nn as nn
 
-
 def ppo_layer_init(layer, std=np.sqrt(2), bias_constant=0.0):
     """Initialize layer weights using the PPO initialization method.
 
