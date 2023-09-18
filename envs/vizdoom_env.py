@@ -1,3 +1,8 @@
+# Source: ViZDoom Gymnasium Wrapper
+# Author: Farma Foundation
+# Code version: f3f2d07 (Commit Hash)
+# Availability: https://github.com/Farama-Foundation/ViZDoom/blob/master/gymnasium_wrapper/base_gymnasium_env.py
+
 import itertools
 import warnings
 from typing import Optional

@@ -7,12 +7,10 @@ class Segment:
         Initializes a Segment object.
 
         Parameters:
-            num_steps: int
-                The number of steps in the segment.
-            observation_space: gym.Space
-                The observation space of the environment.
-            action_space: gym.Space
-                The action space of the environment.
+            num_steps (int): The number of steps in the segment.
+            raw_observation_space (gym.spaces.Box): The observation space of the environment.
+            processed_observation_space (gym.spaces.Box): The processed observation space of the environment.
+            action_space (gym.spaces.Discrete): The action space of the environment.
         """
         self.raw_observations = np.zeros((num_steps,) + raw_observation_space.shape, dtype=raw_observation_space.dtype)
         self.processed_observations = np.zeros((num_steps,) + processed_observation_space.shape, dtype=processed_observation_space.dtype)
@@ -32,38 +30,20 @@ class Segment:
         Returns the data at the specified index in the segment.
 
         Parameters:
-            index: int
-                The index of the data to retrieve.
+            index (int): The index of the data to retrieve.
 
         Returns:
-            tuple
-                A tuple containing observation, action, log probability, reward, value, and termination status at the specified index.
-        """
-        return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.terminations[index]
-
-    def __getitem__(self, index):
-        """
-        Get the data at the specified index in the ReplayBuffer.
-
-        Parameters:
-            index: int
-                The index of the data to retrieve.
-
-        Returns:
-            tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and termination status at the specified index.
+            tuple: A tuple containing observation, action, log probability, reward, value, and termination status at the specified index.
         """
         return self.raw_observations[index], self.processed_observations[index], self.actions[index], self.log_probs[index], self.rewards[index], self.values[index], self.terminations[index]
 
     def __setitem__(self, index, value):
         """
-        Set the data at the specified index in the ReplayBuffer.
+        Set the data at the specified index in the segment.
 
         Parameters:
-            index: int
-                The index where the data will be set.
-            value: tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and termination status to be set at the specified index.
+            index (int): The index where the data will be set.
+            value (tuple): A tuple containing observations, actions, log probabilities, rewards, values, and termination status to be set at the specified index.
         """
         self.raw_observations[index] = value[0]
         self.processed_observations[index] = value[1]
@@ -75,35 +55,32 @@ class Segment:
 
     def __len__(self):
         """
-        Get the number of steps in the ReplayBuffer.
+        Get the number of steps in the segment.
 
         Returns:
-            int
-                The number of steps in the ReplayBuffer.
+            int: The number of steps in the segment.
         """
         return self.num_steps
 
     def __iter__(self):
         """
-        Initialize the iterator for the ReplayBuffer.
+        Initialize the iterator for the segment.
 
         Returns:
-            ReplayBuffer
-                The iterator object.
+            Segment: The iterator object.
         """
         self.index = 0
         return self
 
     def __next__(self):
         """
-        Get the next data in the ReplayBuffer during iteration.
+        Get the next data in the segment during iteration.
 
         Returns:
-            tuple
-                A tuple containing observations, actions, log probabilities, rewards, values, and termination status.
+            tuple: A tuple containing observations, actions, log probabilities, rewards, values, and termination status.
+        
         Raises:
-            StopIteration
-                When the iteration is complete.
+            StopIteration: When the iteration is complete.
         """
         if self.index < self.num_steps:
             result = (self.raw_observations[self.index], self.processed_observations[self.index], self.actions[self.index], self.log_probs[self.index], self.rewards[self.index], self.values[self.index], self.terminations[self.index])

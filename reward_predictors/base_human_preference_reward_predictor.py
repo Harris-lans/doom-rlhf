@@ -10,13 +10,13 @@ from typing import Tuple
 FLOAT_EPSILON = 1e-8
 
 class BaseHumanPreferenceRewardPredictor(nn.Module):
-    """A convolutional neural network model for reward prediction.
+    """
+    A convolutional neural network model for reward prediction.
 
     Args:
+        observation_encoder_network (nn.Sequential): The observation encoder network.
+        reward_predictor_network (nn.Sequential): The reward predictor network.
         observation_shape (tuple): The shape of the input observations.
-        action_shape (int or tuple): The shape of the input actions.
-        model_path (str, optional): Path to load pre-trained models from. Defaults to None.
-        hidden_size (int, optional): The size of the hidden layers. Defaults to 256.
         learning_rate (float, optional): The learning rate for optimization. Defaults to 1e-3.
         use_gpu (bool, optional): Whether to use GPU if available. Defaults to True.
     """
@@ -46,7 +46,8 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         self.running_stat = RunningStat(self.device)
 
     def save_models(self, path='./models'):
-        """Save the model's weights to a file.
+        """
+        Save the model's weights to a file.
 
         Args:
             path (str, optional): Directory to save the models. Defaults to './models'.
@@ -65,7 +66,8 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         }, f"{path}/model.pth")
 
     def load_models(self, path):
-        """Load pre-trained models from a file.
+        """
+        Load pre-trained models from a file.
 
         Args:
             path (str): Directory containing the models.
@@ -82,6 +84,15 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         self.reward_predictor_network.load_state_dict(model_dict['reward_predictor_network'])
 
     def _normalize_rewards(self, rewards: torch.Tensor):
+        """
+        Normalize rewards.
+
+        Args:
+            rewards (torch.Tensor): Raw rewards.
+
+        Returns:
+            torch.Tensor: Normalized rewards.
+        """
         # Normalizing rewards
         rewards -= self.running_stat.mean
         rewards /= (self.running_stat.std + torch.tensor(FLOAT_EPSILON).to(self.device))
@@ -117,11 +128,11 @@ class BaseHumanPreferenceRewardPredictor(nn.Module):
         return reward_predictions.cpu().numpy()
     
     def _training_forward(self, observations: torch.Tensor):
-        """Forward pass of the reward predictor.
+        """
+        Forward pass of the reward predictor for training.
 
         Args:
             observations (torch.Tensor): Input observations.
-            actions (torch.Tensor): Input actions.
 
         Returns:
             torch.Tensor: Predicted rewards.

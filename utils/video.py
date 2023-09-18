@@ -3,6 +3,20 @@ from utils.segment import Segment
 import os
 
 def generate_video_from_doom_play_segments(segment: Segment, output_path: str, fps: int = 30):
+    """
+    Generates a video from a segment of Doom gameplay frames and saves it to the specified output path.
+
+    Parameters:
+        segment (Segment): The segment containing raw gameplay frames.
+        output_path (str): The path to save the generated video.
+        fps (int, optional): Frames per second for the output video. Defaults to 30.
+
+    Note:
+        This function assumes that the frames in the segment are in RGB format.
+
+    Example:
+        generate_video_from_doom_play_segments(segment, "output_video.mp4", fps=30)
+    """
     output_path = os.path.abspath(output_path)
     num_steps, frame_height, frame_width, num_channels = segment.raw_observations.shape
 
