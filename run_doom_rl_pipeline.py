@@ -26,11 +26,11 @@ def parse_args():
         help="The learning rate of the optimizer")
     parser.add_argument("--total-steps", type=int, default=300000,
         help="Total steps to train the agent for")
-    parser.add_argument("--render-env", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
+    parser.add_argument("--render-env", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
         help="If toggled, one environment will be rendered")
     parser.add_argument("--model-save-threshold", type=int, default=7000,
         help="Number of steps before model saving is enabled")
-    parser.add_argument("--enable-gpu", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
+    parser.add_argument("--enable-gpu", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
         help="If toggled, gpu will be used for training and using agent")
     parser.add_argument("--track-stats", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
         help="If toggled, the script will record training statistics using ")
